@@ -20,7 +20,7 @@ class PyObjectId(ObjectId):
 
 class BaseDBModel(BaseModel):
     model_config = ConfigDict(
-        allow_population_by_field_name=True,
+        validate_by_name=True,
         arbitrary_types_allowed=True,
         json_encoders={ObjectId: str},
         json_schema_extra={

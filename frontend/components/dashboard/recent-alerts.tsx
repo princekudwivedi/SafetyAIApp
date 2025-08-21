@@ -1,0 +1,162 @@
+'use client';
+
+import React from 'react';
+import { AlertTriangle, Clock, MapPin, Camera } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface Alert {
+  id: string;
+  type: string;
+  severity: 'High' | 'Medium' | 'Low';
+  description: string;
+  location: string;
+  camera: string;
+  timestamp: string;
+  status: 'New' | 'Assigned' | 'Resolved' | 'Dismissed';
+}
+
+const mockAlerts: Alert[] = [
+  {
+    id: 'AL-001',
+    type: 'No Hard Hat',
+    severity: 'High',
+    description: 'Worker identified without hard hat in Zone 3',
+    location: 'Zone 3 - Warehouse Area',
+    camera: 'CAM_05',
+    timestamp: '2 minutes ago',
+    status: 'New',
+  },
+  {
+    id: 'AL-002',
+    type: 'Proximity Violation',
+    severity: 'Medium',
+    description: 'Worker too close to operating machinery',
+    location: 'Zone 1 - Construction Site',
+    camera: 'CAM_02',
+    timestamp: '5 minutes ago',
+    status: 'Assigned',
+  },
+  {
+    id: 'AL-003',
+    type: 'No Safety Vest',
+    severity: 'Medium',
+    description: 'Worker without high-visibility vest detected',
+    location: 'Zone 2 - Loading Dock',
+    camera: 'CAM_03',
+    timestamp: '8 minutes ago',
+    status: 'New',
+  },
+  {
+    id: 'AL-004',
+    type: 'Unauthorized Access',
+    severity: 'Low',
+    description: 'Personnel in restricted area without clearance',
+    location: 'Zone 4 - Equipment Storage',
+    camera: 'CAM_07',
+    timestamp: '12 minutes ago',
+    status: 'Resolved',
+  },
+  {
+    id: 'AL-005',
+    type: 'Equipment Misuse',
+    severity: 'High',
+    description: 'Forklift operated without proper safety measures',
+    location: 'Zone 1 - Construction Site',
+    camera: 'CAM_01',
+    timestamp: '15 minutes ago',
+    status: 'Assigned',
+  },
+];
+
+const severityColors = {
+  High: 'bg-red-100 text-red-800 border-red-200',
+  Medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  Low: 'bg-blue-100 text-blue-800 border-blue-200',
+};
+
+const statusColors = {
+  New: 'bg-red-100 text-red-800',
+  Assigned: 'bg-yellow-100 text-yellow-800',
+  Resolved: 'bg-green-100 text-green-800',
+  Dismissed: 'bg-gray-100 text-gray-800',
+};
+
+export function RecentAlerts() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-gray-900">Recent Alerts</h3>
+        <button className="text-sm text-primary-600 hover:text-primary-500">
+          View All
+        </button>
+      </div>
+      
+      <div className="space-y-3 max-h-80 overflow-y-auto">
+        {mockAlerts.map((alert) => (
+          <div
+            key={alert.id}
+            className="p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span
+                    className={cn(
+                      'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border',
+                      severityColors[alert.severity]
+                    )}
+                  >
+                    {alert.severity}
+                  </span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                      statusColors[alert.status]
+                    )}
+                  >
+                    {alert.status}
+                  </span>
+                </div>
+                
+                <h4 className="font-medium text-gray-900 mb-1">
+                  {alert.type}
+                </h4>
+                
+                <p className="text-sm text-gray-600 mb-3">
+                  {alert.description}
+                </p>
+                
+                <div className="flex items-center space-x-4 text-xs text-gray-500">
+                  <div className="flex items-center">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    {alert.location}
+                  </div>
+                  <div className="flex items-center">
+                    <Camera className="h-3 w-3 mr-1" />
+                    {alert.camera}
+                  </div>
+                  <div className="flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {alert.timestamp}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="ml-4">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {mockAlerts.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <p>No recent alerts</p>
+          <p className="text-sm">All systems are operating normally</p>
+        </div>
+      )}
+    </div>
+  );
+}

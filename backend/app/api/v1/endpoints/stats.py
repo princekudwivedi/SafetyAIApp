@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any
+from fastapi import APIRouter, HTTPException, Depends, Query
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import get_database
 from app.models.safety import AlertStatus, SeverityLevel
+from app.models.user import User
+from app.api.v1.endpoints.auth import get_current_active_user
 import json
 import random
 
@@ -393,6 +395,6 @@ async def export_stats_csv(
         
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"Error exporting statistics: {str(e)}"
         )

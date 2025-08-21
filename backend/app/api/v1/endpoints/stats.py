@@ -23,17 +23,33 @@ async def get_dashboard_stats(db: AsyncIOMotorDatabase = Depends(get_database)):
         # Get total alerts count
         total_alerts = await db.alerts.count_documents({})
         
-        # Get today's alerts
+        # Get today's alerts - handle both string and datetime timestamps
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_alerts = await db.alerts.count_documents({
-            "timestamp": {"$gte": now.replace(hour=0, minute=0, second=0, microsecond=0)}
+            "$or": [
+                {"timestamp": {"$gte": today_start}},
+                {"timestamp": {"$gte": today_start.isoformat()}}
+            ]
         })
         
-        # Get yesterday's alerts
+        # Get yesterday's alerts - handle both string and datetime timestamps
+        yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_end = now.replace(hour=0, minute=0, second=0, microsecond=0)
         yesterday_alerts = await db.alerts.count_documents({
-            "timestamp": {
-                "$gte": yesterday.replace(hour=0, minute=0, second=0, microsecond=0),
-                "$lt": now.replace(hour=0, minute=0, second=0, microsecond=0)
-            }
+            "$or": [
+                {
+                    "timestamp": {
+                        "$gte": yesterday_start,
+                        "$lt": yesterday_end
+                    }
+                },
+                {
+                    "timestamp": {
+                        "$gte": yesterday_start.isoformat(),
+                        "$lt": yesterday_end.isoformat()
+                    }
+                }
+            ]
         })
         
         # Get alerts by status
@@ -58,11 +74,28 @@ async def get_dashboard_stats(db: AsyncIOMotorDatabase = Depends(get_database)):
             resolved_percentage = (resolved_alerts / total_alerts) * 100
             safety_score = max(50, min(100, 100 - (resolved_percentage * 0.5)))
         
-        # Get recent alerts for timeline
-        recent_alerts = await db.alerts.find(
-            {"timestamp": {"$gte": last_week}},
+        # Get recent alerts for timeline - handle both string and datetime timestamps
+        recent_alerts_raw = await db.alerts.find(
+            {
+                "$or": [
+                    {"timestamp": {"$gte": last_week}},
+                    {"timestamp": {"$gte": last_week.isoformat()}}
+                ]
+            },
             {"timestamp": 1, "violation_type": 1, "severity_level": 1, "status": 1}
         ).sort("timestamp", -1).limit(10).to_list(length=10)
+        
+        # Convert ObjectId to string and handle datetime serialization
+        recent_alerts = []
+        for alert in recent_alerts_raw:
+            alert_dict = {
+                "alert_id": str(alert.get("_id")),
+                "timestamp": alert.get("timestamp").isoformat() if hasattr(alert.get("timestamp"), 'isoformat') else str(alert.get("timestamp")),
+                "violation_type": alert.get("violation_type"),
+                "severity_level": alert.get("severity_level"),
+                "status": alert.get("status")
+            }
+            recent_alerts.append(alert_dict)
         
         # Get violation types distribution
         violation_types_pipeline = [
@@ -70,9 +103,17 @@ async def get_dashboard_stats(db: AsyncIOMotorDatabase = Depends(get_database)):
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        violation_types = await db.alerts.aggregate(violation_types_pipeline).to_list(length=10)
+        violation_types_raw = await db.alerts.aggregate(violation_types_pipeline).to_list(length=10)
         
-        # Get weekly trend data
+        # Convert ObjectId to string in violation types
+        violation_types = []
+        for item in violation_types_raw:
+            violation_types.append({
+                "_id": str(item.get("_id")),
+                "count": item.get("count")
+            })
+        
+        # Get weekly trend data - handle both string and datetime timestamps
         weekly_data = []
         for i in range(7):
             date = now - timedelta(days=i)
@@ -80,7 +121,20 @@ async def get_dashboard_stats(db: AsyncIOMotorDatabase = Depends(get_database)):
             end_of_day = start_of_day + timedelta(days=1)
             
             day_alerts = await db.alerts.count_documents({
-                "timestamp": {"$gte": start_of_day, "$lt": end_of_day}
+                "$or": [
+                    {
+                        "timestamp": {
+                            "$gte": start_of_day,
+                            "$lt": end_of_day
+                        }
+                    },
+                    {
+                        "timestamp": {
+                            "$gte": start_of_day.isoformat(),
+                            "$lt": end_of_day.isoformat()
+                        }
+                    }
+                ]
             })
             
             weekly_data.append({
@@ -100,16 +154,19 @@ async def get_dashboard_stats(db: AsyncIOMotorDatabase = Depends(get_database)):
             "high_severity_alerts": high_severity,
             "medium_severity_alerts": medium_severity,
             "low_severity_alerts": low_severity,
-                "total_cameras": total_cameras,
-                "total_sites": total_sites,
+            "total_cameras": total_cameras,
+            "total_sites": total_sites,
             "safety_score": round(safety_score, 1),
             "recent_alerts": recent_alerts,
             "violation_types": violation_types,
-            "weekly_trend": weekly_data,
+            "weekly_data": weekly_data,
             "last_updated": now.isoformat()
         }
         
     except Exception as e:
+        import traceback
+        print(f"Dashboard stats error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error fetching dashboard stats: {str(e)}")
 
 @router.get("/alerts/summary")
@@ -122,47 +179,72 @@ async def get_alerts_summary(
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days)
         
-        # Get alerts in date range
+        # Get alerts in date range - handle both string and datetime timestamps
         alerts = await db.alerts.find({
-            "timestamp": {"$gte": start_date, "$lte": end_date}
+            "$or": [
+                {"timestamp": {"$gte": start_date, "$lte": end_date}},
+                {"timestamp": {"$gte": start_date.isoformat(), "$lte": end_date.isoformat()}}
+            ]
         }).to_list(length=1000)
         
         # Process alerts data
-        alerts_by_date = {}
-        violation_types = {}
-        severity_levels = {}
+        alerts_by_status = []
+        alerts_by_severity = []
+        recent_alerts = []
+        
+        # Count by status
+        status_counts = {}
+        severity_counts = {}
         
         for alert in alerts:
-            date_key = alert["timestamp"].strftime("%Y-%m-%d")
-            
-            # Count by date
-            if date_key not in alerts_by_date:
-                alerts_by_date[date_key] = 0
-            alerts_by_date[date_key] += 1
-            
-            # Count by violation type
-            violation_type = alert["violation_type"]
-            if violation_type not in violation_types:
-                violation_types[violation_type] = 0
-            violation_types[violation_type] += 1
+            # Count by status
+            status = alert.get("status", "Unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
             
             # Count by severity
-            severity = alert["severity_level"]
-            if severity not in severity_levels:
-                severity_levels[severity] = 0
-            severity_levels[severity] += 1
+            severity = alert.get("severity_level", "Unknown")
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+        
+        # Convert to arrays for frontend
+        for status, count in status_counts.items():
+            alerts_by_status.append({"status": status, "count": count})
+        
+        for severity, count in severity_counts.items():
+            alerts_by_severity.append({"severity": severity, "count": count})
+        
+        # Get recent alerts (last 10)
+        recent_alerts_raw = await db.alerts.find({
+            "$or": [
+                {"timestamp": {"$gte": end_date - timedelta(days=7)}},
+                {"timestamp": {"$gte": (end_date - timedelta(days=7)).isoformat()}}
+            ]
+        }).sort("timestamp", -1).limit(10).to_list(length=10)
+        
+        # Convert ObjectId to string and handle datetime serialization
+        recent_alerts = []
+        for alert in recent_alerts_raw:
+            alert_dict = {
+                "alert_id": str(alert.get("_id")),
+                "timestamp": alert.get("timestamp").isoformat() if hasattr(alert.get("timestamp"), 'isoformat') else str(alert.get("timestamp")),
+                "violation_type": alert.get("violation_type"),
+                "severity_level": alert.get("severity_level"),
+                "description": alert.get("description", ""),
+                "camera_id": alert.get("camera_id", ""),
+                "status": alert.get("status"),
+                "confidence_score": alert.get("confidence_score", 0)
+            }
+            recent_alerts.append(alert_dict)
         
         return {
-            "period": f"Last {days} days",
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "total_alerts": len(alerts),
-            "alerts_by_date": alerts_by_date,
-            "violation_types": violation_types,
-            "severity_levels": severity_levels
+            "alerts_by_status": alerts_by_status,
+            "alerts_by_severity": alerts_by_severity,
+            "recent_alerts": recent_alerts
         }
         
     except Exception as e:
+        import traceback
+        print(f"Alerts summary error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error fetching alerts summary: {str(e)}")
 
 @router.get("/alerts/trends")

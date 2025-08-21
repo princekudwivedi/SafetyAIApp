@@ -8,20 +8,11 @@ interface MetricCardProps {
   title: string;
   value: number | string;
   icon: LucideIcon;
-  color?: 'red' | 'orange' | 'blue' | 'green' | 'purple';
   trend?: 'up' | 'down' | 'stable';
   trendValue?: number;
   trendLabel?: string;
   className?: string;
 }
-
-const colorClasses = {
-  red: 'text-red-600 bg-red-100',
-  orange: 'text-orange-600 bg-orange-100',
-  blue: 'text-blue-600 bg-blue-100',
-  green: 'text-green-600 bg-green-100',
-  purple: 'text-purple-600 bg-purple-100',
-};
 
 const trendIcons = {
   up: TrendingUp,
@@ -39,14 +30,13 @@ export function MetricCard({
   title,
   value,
   icon: Icon,
-  color = 'blue',
   trend,
   trendValue,
   trendLabel,
   className,
 }: MetricCardProps) {
   return (
-    <div className={cn('bg-white rounded-lg shadow p-6', className)}>
+    <div className={cn('bg-white rounded-lg border p-6', className)}>
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600 truncate">{title}</p>
@@ -67,7 +57,7 @@ export function MetricCard({
           )}
         </div>
         
-        <div className={cn('flex h-12 w-12 items-center justify-center rounded-lg', colorClasses[color])}>
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
           <Icon className="h-6 w-6" />
         </div>
       </div>

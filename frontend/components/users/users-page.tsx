@@ -27,7 +27,13 @@ const mockUsers: User[] = [
     site_id: 'site1',
     is_active: true,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-12-01T00:00:00Z'
+    updated_at: '2024-12-01T00:00:00Z',
+    firstName: 'System',
+    lastName: 'Administrator',
+    isActive: true,
+    createdAt: new Date('2024-01-01'),
+    lastLogin: new Date('2024-12-01'),
+    siteId: 'site1'
   },
   {
     id: '2',
@@ -37,7 +43,13 @@ const mockUsers: User[] = [
     site_id: 'site1',
     is_active: true,
     created_at: '2024-01-15T00:00:00Z',
-    updated_at: '2024-12-01T00:00:00Z'
+    updated_at: '2024-12-01T00:00:00Z',
+    firstName: 'Site',
+    lastName: 'Supervisor',
+    isActive: true,
+    createdAt: new Date('2024-01-15'),
+    lastLogin: new Date('2024-12-01'),
+    siteId: 'site1'
   },
   {
     id: '3',
@@ -47,7 +59,13 @@ const mockUsers: User[] = [
     site_id: 'site2',
     is_active: true,
     created_at: '2024-02-01T00:00:00Z',
-    updated_at: '2024-11-30T00:00:00Z'
+    updated_at: '2024-11-30T00:00:00Z',
+    firstName: 'Safety',
+    lastName: 'Officer',
+    isActive: true,
+    createdAt: new Date('2024-02-01'),
+    lastLogin: new Date('2024-11-30'),
+    siteId: 'site2'
   },
   {
     id: '4',
@@ -57,13 +75,21 @@ const mockUsers: User[] = [
     site_id: 'site1',
     is_active: false,
     created_at: '2024-03-01T00:00:00Z',
-    updated_at: '2024-10-15T00:00:00Z'
+    updated_at: '2024-10-15T00:00:00Z',
+    firstName: 'System',
+    lastName: 'Operator',
+    isActive: false,
+    createdAt: new Date('2024-03-01'),
+    lastLogin: new Date('2024-10-15'),
+    siteId: 'site1'
   }
 ];
 
 const userFormSchema = z.object({
   username: z.string().min(2, 'Username must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
   role: z.nativeEnum(UserRole),
   site_id: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters').optional(),
@@ -132,8 +158,8 @@ export default function UsersPage() {
     if (searchTerm) {
       filtered = filtered.filter(user =>
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(searchTerm.toLowerCase())
+        (user.firstName && user.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (user.lastName && user.lastName.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -156,14 +182,19 @@ export default function UsersPage() {
       // TODO: Replace with actual API call
       const newUser: User = {
         id: Date.now().toString(),
+        username: data.username,
         email: data.email,
+        role: data.role,
+        site_id: data.site_id,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         firstName: data.firstName,
         lastName: data.lastName,
-        role: data.role,
         isActive: true,
         createdAt: new Date(),
         lastLogin: null,
-        siteId: data.siteId || undefined
+        siteId: data.site_id || undefined
       };
 
       setUsers(prev => [...prev, newUser]);
@@ -265,7 +296,7 @@ export default function UsersPage() {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      siteId: user.siteId || '',
+      site_id: user.siteId || '',
       password: '',
       confirmPassword: ''
     });

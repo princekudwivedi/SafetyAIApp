@@ -7,6 +7,13 @@ export interface User {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Additional properties for user management
+  firstName?: string;
+  lastName?: string;
+  isActive?: boolean;
+  createdAt?: Date;
+  lastLogin?: Date | null;
+  siteId?: string;
 }
 
 export enum UserRole {

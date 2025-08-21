@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
 import { MetricCard } from './metric-card';
 import { SafetyChart } from './safety-chart';
 import { RecentAlerts } from './recent-alerts';
 import { SystemStatus } from './system-status';
 import { TrendingUp, TrendingDown, AlertTriangle, Video, Users, Shield } from 'lucide-react';
+import { dashboardApi, DashboardStats as ApiDashboardStats, AlertsSummary } from '@/lib/api/dashboard';
 
 interface DashboardStats {
   totalViolations: number;
@@ -30,8 +31,65 @@ export function DashboardOverview() {
     safetyScore: 87,
   });
   const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Centralized data state for child components
+  const [dashboardData, setDashboardData] = useState<ApiDashboardStats | null>(null);
+  const [alertsSummary, setAlertsSummary] = useState<AlertsSummary | null>(null);
+  
+  // Ref to ensure data is only loaded once
+  const dataLoadedRef = useRef(false);
+
+  // Single data loading function that fetches all data at once
+  const loadAllDashboardData = useCallback(async () => {
+    // Prevent multiple data loads
+    if (dataLoadedRef.current) {
+      console.log('🔄 Data already loaded, skipping...'); // Debug log
+      return;
+    }
+    
+    try {
+      console.log('🔄 Loading all dashboard data...'); // Debug log
+      setIsLoading(true);
+      setHasError(false);
+      
+      // Fetch all data in parallel to minimize API calls
+      const [apiStats, apiAlertsSummary] = await Promise.all([
+        dashboardApi.getDashboardStats(),
+        dashboardApi.getAlertsSummary()
+      ]);
+      
+      console.log('✅ Dashboard data loaded successfully'); // Debug log
+      
+      // Store raw data for child components
+      setDashboardData(apiStats);
+      setAlertsSummary(apiAlertsSummary);
+      
+      // Transform API data to component format
+      setStats({
+        totalViolations: apiStats.total_alerts,
+        activeAlerts: apiStats.new_alerts + apiStats.in_progress_alerts,
+        activeCameras: apiStats.total_cameras,
+        workersMonitored: Math.floor(apiStats.total_cameras * 5.6), // Estimate based on cameras
+        violationsToday: apiStats.today_alerts,
+        violationsYesterday: apiStats.yesterday_alerts,
+        safetyScore: apiStats.safety_score,
+      });
+      
+      // Mark data as loaded
+      dataLoadedRef.current = true;
+    } catch (error) {
+      console.error('❌ Failed to load dashboard data:', error);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
+    console.log('🚀 Dashboard component mounted, loading data...'); // Debug log
+    console.log('📊 Component ID:', Math.random().toString(36).substr(2, 9)); // Debug log
+    
     try {
       // Subscribe to real-time updates
       const unsubscribeStats = subscribe('dashboard_stats', (data) => {
@@ -51,10 +109,11 @@ export function DashboardOverview() {
         }
       });
 
-      // Load initial data
-      loadDashboardData();
+      // Load initial data only once
+      loadAllDashboardData();
 
       return () => {
+        console.log('🧹 Dashboard component unmounting, cleaning up...'); // Debug log
         unsubscribeStats();
         unsubscribeAlerts();
       };
@@ -62,26 +121,7 @@ export function DashboardOverview() {
       console.error('Dashboard initialization error:', error);
       setHasError(true);
     }
-  }, [subscribe]);
-
-  const loadDashboardData = async () => {
-    try {
-      // In a real app, this would fetch from the API
-      // For now, using mock data
-      setStats({
-        totalViolations: 156,
-        activeAlerts: 23,
-        activeCameras: 8,
-        workersMonitored: 45,
-        violationsToday: 12,
-        violationsYesterday: 8,
-        safetyScore: 87,
-      });
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      setHasError(true);
-    }
-  };
+  }, [subscribe, loadAllDashboardData]);
 
   const getViolationTrend = () => {
     // Handle division by zero and edge cases
@@ -95,28 +135,36 @@ export function DashboardOverview() {
     
     if (stats.violationsToday > stats.violationsYesterday) {
       const percentage = Math.round(((stats.violationsToday - stats.violationsYesterday) / stats.violationsYesterday) * 100);
-      return { trend: 'up', percentage: isFinite(percentage) ? percentage : 100 };
+      return { trend: 'up', percentage };
     } else if (stats.violationsToday < stats.violationsYesterday) {
       const percentage = Math.round(((stats.violationsYesterday - stats.violationsToday) / stats.violationsYesterday) * 100);
-      return { trend: 'down', percentage: isFinite(percentage) ? percentage : 100 };
+      return { trend: 'down', percentage };
+    } else {
+      return { trend: 'stable', percentage: 0 };
     }
-    return { trend: 'stable', percentage: 0 };
   };
 
-  const violationTrend = getViolationTrend();
+  const trend = getViolationTrend();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (hasError) {
     return (
-      <div className="py-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <h2 className="text-lg font-medium text-red-800 mb-2">Dashboard Error</h2>
-          <p className="text-red-600 mb-4">There was an issue loading the dashboard data.</p>
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Failed to load dashboard data</p>
           <button 
-            onClick={() => {
-              setHasError(false);
-              loadDashboardData();
-            }}
-            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+            onClick={loadAllDashboardData}
+            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             Retry
           </button>
@@ -126,7 +174,7 @@ export function DashboardOverview() {
   }
 
   return (
-    <div className="py-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
@@ -149,87 +197,85 @@ export function DashboardOverview() {
         </div>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Total Violations"
           value={stats.totalViolations}
           icon={AlertTriangle}
-          trend={violationTrend.trend as 'up' | 'down' | 'stable'}
-          trendValue={violationTrend.percentage}
+          trend={trend.trend as 'up' | 'down' | 'stable'}
+          trendValue={trend.percentage}
           trendLabel="vs yesterday"
-          color="red"
+          className="bg-red-50 border-red-200"
         />
         <MetricCard
           title="Active Alerts"
           value={stats.activeAlerts}
           icon={AlertTriangle}
-          color="orange"
+          className="bg-yellow-50 border-yellow-200"
         />
         <MetricCard
           title="Active Cameras"
           value={stats.activeCameras}
           icon={Video}
-          color="blue"
+          className="bg-blue-50 border-blue-200"
         />
         <MetricCard
           title="Workers Monitored"
           value={stats.workersMonitored}
           icon={Users}
-          color="green"
+          className="bg-green-50 border-green-200"
         />
       </div>
 
       {/* Safety Score */}
-      <div className="mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Safety Score</h2>
-            <Shield className="h-6 w-6 text-primary-600" />
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Safety Score</h3>
+          <Shield className="h-6 w-6 text-primary-600" />
+        </div>
+        <div className="text-center">
+          <div className="text-4xl font-bold text-primary-600 mb-2">
+            {stats.safetyScore}%
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">Overall Safety Rating</span>
-                <span className="text-2xl font-bold text-primary-600">{stats.safetyScore}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div 
-                  className="bg-primary-600 h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${stats.safetyScore}%` }}
-                />
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Based on compliance, incident rates, and safety measures
-              </p>
-            </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div
+              className="bg-primary-600 h-3 rounded-full transition-all duration-300"
+              style={{ width: `${stats.safetyScore}%` }}
+            ></div>
           </div>
+          <p className="text-sm text-gray-600 mt-2">
+            {stats.safetyScore >= 80 ? 'Excellent' : 
+             stats.safetyScore >= 60 ? 'Good' : 
+             stats.safetyScore >= 40 ? 'Fair' : 'Poor'} safety performance
+          </p>
         </div>
       </div>
 
-      {/* Charts and Data */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Weekly Safety Violations</h2>
-            <SafetyChart />
-          </div>
+      {/* Charts and Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Weekly Safety Violations</h2>
+          <SafetyChart 
+            dashboardData={dashboardData}
+            alertsSummary={alertsSummary}
+            isLoading={isLoading}
+          />
         </div>
         
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Alerts</h2>
-            <RecentAlerts />
-          </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Alerts</h2>
+          <RecentAlerts 
+            alertsSummary={alertsSummary}
+            isLoading={isLoading}
+          />
         </div>
       </div>
 
       {/* System Status */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
-          <SystemStatus />
-        </div>
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
+        <SystemStatus />
       </div>
     </div>
   );

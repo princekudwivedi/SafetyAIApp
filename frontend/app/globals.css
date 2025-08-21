@@ -288,7 +288,25 @@
 }
 
 .form-input {
-  @apply input;
+  @apply input relative;
+}
+
+.form-input:focus {
+  @apply ring-2 ring-primary-500 ring-offset-2;
+}
+
+.form-input::placeholder {
+  @apply text-gray-400;
+}
+
+/* Input with left icon */
+.form-input-with-icon {
+  @apply flex h-10 w-full rounded-md border border-gray-300 bg-white pl-10 pr-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* Input with both left and right icons */
+.form-input-with-icons {
+  @apply flex h-10 w-full rounded-md border border-gray-300 bg-white pl-10 pr-10 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .form-error {

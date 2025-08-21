@@ -103,14 +103,14 @@ export function LoginForm() {
             Username
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
               <User className="h-5 w-5 text-gray-400" />
             </div>
             <input
               {...register('username')}
               id="username"
               type="text"
-              className="form-input pl-10"
+              className="form-input-with-icon"
               placeholder="Enter your username"
               disabled={isLoading}
             />
@@ -125,20 +125,20 @@ export function LoginForm() {
             Password
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
               <Lock className="h-5 w-5 text-gray-400" />
             </div>
             <input
               {...register('password')}
               id="password"
               type={showPassword ? 'text' : 'password'}
-              className="form-input pl-10 pr-10"
+              className="form-input-with-icons"
               placeholder="Enter your password"
               disabled={isLoading}
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center z-10"
               onClick={() => setShowPassword(!showPassword)}
               disabled={isLoading}
             >

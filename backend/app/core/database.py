@@ -89,6 +89,8 @@ async def init_db():
 
 def get_database():
     """Get database instance."""
+    if not db.client:
+        raise RuntimeError("Database not initialized. Please ensure the application has started properly.")
     return db.client[settings.DATABASE_NAME]
 
 def get_sync_database():

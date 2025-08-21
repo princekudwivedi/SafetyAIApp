@@ -27,14 +27,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      refreshUser();
-    } else {
+    // Check if user is already logged in with valid session
+    checkExistingSession();
+  }, []);
+
+  const checkExistingSession = () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const sessionData = localStorage.getItem('auth_session');
+      
+      if (token && sessionData) {
+        const session = JSON.parse(sessionData);
+        const now = Date.now();
+        
+        // Check if session is still valid (24 hours)
+        if (session.expiresAt > now) {
+          // Session is valid, restore user
+          setUser(session.user);
+          setIsLoading(false);
+          return;
+        } else {
+          // Session expired, clear it
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_session');
+        }
+      }
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error checking session:', error);
+      // Clear invalid session data
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_session');
       setIsLoading(false);
     }
-  }, []);
+  };
 
   const login = async (credentials: LoginCredentials) => {
     try {
@@ -58,9 +85,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString(),
         };
         
-        // Store dummy token
+        // Store dummy token and session data
         const dummyToken = `dummy-token-${Date.now()}`;
+        const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
+        
         localStorage.setItem('auth_token', dummyToken);
+        localStorage.setItem('auth_session', JSON.stringify({
+          user: userData,
+          expiresAt: expiresAt,
+          createdAt: Date.now()
+        }));
         
         // Set user
         setUser(userData);
@@ -70,7 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If not dummy credentials, try real API
       try {
         const response = await authApi.login(credentials);
+        const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
+        
         localStorage.setItem('auth_token', response.access_token);
+        localStorage.setItem('auth_session', JSON.stringify({
+          expiresAt: expiresAt,
+          createdAt: Date.now()
+        }));
+        
         await refreshUser();
       } catch (apiError) {
         console.error('API login failed:', apiError);
@@ -86,15 +127,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_session');
     setUser(null);
   };
 
   const refreshUser = async () => {
     try {
       const token = localStorage.getItem('auth_token');
+      const sessionData = localStorage.getItem('auth_session');
+      
       if (token && token.startsWith('dummy-token-')) {
-        // For dummy users, just return the current user
+        // For dummy users, check if session is still valid
+        if (sessionData) {
+          const session = JSON.parse(sessionData);
+          if (session.expiresAt > Date.now()) {
+            setUser(session.user);
+            return;
+          } else {
+            // Session expired, clear it
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_session');
+            setUser(null);
+          }
+        }
         return;
+      }
+      
+      // For real API users, check session expiration first
+      if (sessionData) {
+        const session = JSON.parse(sessionData);
+        if (session.expiresAt <= Date.now()) {
+          // Session expired, clear it
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_session');
+          setUser(null);
+          return;
+        }
       }
       
       const userData = await authApi.getCurrentUser();
@@ -102,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to refresh user:', error);
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_session');
       setUser(null);
     } finally {
       setIsLoading(false);

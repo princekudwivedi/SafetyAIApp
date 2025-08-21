@@ -62,6 +62,8 @@ const useFormField = () => {
 
 type FormItemContextValue = {
   id: string
+  formDescriptionId: string
+  formMessageId: string
 }
 
 const FormItemContext = React.createContext<FormItemContextValue>(
@@ -75,7 +77,11 @@ const FormItem = React.forwardRef<
   const id = React.useId()
 
   return (
-    <FormItemContext.Provider value={{ id }}>
+    <FormItemContext.Provider value={{ 
+      id, 
+      formDescriptionId: `${id}-form-item-description`,
+      formMessageId: `${id}-form-item-message`
+    }}>
       <div ref={ref} className={cn("space-y-2", className)} {...props} />
     </FormItemContext.Provider>
   )

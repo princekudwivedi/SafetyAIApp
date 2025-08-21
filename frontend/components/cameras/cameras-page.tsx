@@ -234,7 +234,7 @@ export function CamerasPage() {
   };
 
   const getUniqueSites = () => {
-    return [...new Set(cameras.map(camera => camera.siteId))];
+    return Array.from(new Set(cameras.map(camera => camera.siteId)));
   };
 
   return (

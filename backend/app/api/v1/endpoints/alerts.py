@@ -1,313 +1,274 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from typing import List, Optional
-from datetime import datetime, timedelta
-from app.models.user import User
-from app.models.safety import Alert, AlertCreate, AlertUpdate, AlertStatus, SeverityLevel, ViolationType
-from app.services.alert_service import AlertService
-from app.api.v1.endpoints.auth import get_current_active_user
+from fastapi import APIRouter, HTTPException, Depends, Query, status
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone, timedelta
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import get_database
+from app.models.safety import Alert, AlertCreate, AlertUpdate, AlertStatus, SeverityLevel
+from app.models.user import User
+from app.api.v1.endpoints.auth import get_current_active_user
+import json
 
 router = APIRouter()
-alert_service = AlertService()
 
-@router.get("/", response_model=List[Alert])
+@router.get("/", response_model=List[Dict[str, Any]])
 async def get_alerts(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    status: Optional[AlertStatus] = Query(None),
-    severity: Optional[SeverityLevel] = Query(None),
-    violation_type: Optional[ViolationType] = Query(None),
-    camera_id: Optional[str] = Query(None),
-    location_id: Optional[str] = Query(None),
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    status: Optional[AlertStatus] = None,
+    severity: Optional[SeverityLevel] = None,
+    camera_id: Optional[str] = None,
+    site_id: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get alerts with filtering options."""
+    """Get alerts with optional filtering"""
     try:
-        alerts = await alert_service.get_alerts(
-            skip=skip,
-            limit=limit,
-            status=status,
-            severity=severity,
-            violation_type=violation_type,
-            camera_id=camera_id,
-            location_id=location_id,
-            start_date=start_date,
-            end_date=end_date
-        )
+        # Build filter query
+        filter_query = {}
+        
+        if status:
+            filter_query["status"] = status
+        if severity:
+            filter_query["severity_level"] = severity
+        if camera_id:
+            filter_query["camera_id"] = camera_id
+        if site_id:
+            filter_query["location_id"] = site_id
+        if start_date or end_date:
+            timestamp_filter = {}
+            if start_date:
+                timestamp_filter["$gte"] = start_date
+            if end_date:
+                timestamp_filter["$lte"] = end_date
+            filter_query["timestamp"] = timestamp_filter
+        
+        # Get alerts from database
+        cursor = db.alerts.find(filter_query).sort("timestamp", -1).skip(skip).limit(limit)
+        alerts = await cursor.to_list(length=limit)
+        
+        # Convert ObjectId to string for JSON serialization
+        for alert in alerts:
+            if "_id" in alert:
+                alert["_id"] = str(alert["_id"])
+            if "timestamp" in alert:
+                alert["timestamp"] = alert["timestamp"].isoformat()
+        
         return alerts
+        
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving alerts: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching alerts: {str(e)}")
 
-@router.get("/{alert_id}", response_model=Alert)
+@router.get("/{alert_id}", response_model=Dict[str, Any])
 async def get_alert(
     alert_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get a specific alert by ID."""
+    """Get a specific alert by ID"""
     try:
-        alert = await alert_service.get_alert(alert_id)
+        alert = await db.alerts.find_one({"alert_id": alert_id})
+        
         if not alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Alert not found"
-            )
+            raise HTTPException(status_code=404, detail="Alert not found")
+        
+        # Convert ObjectId to string for JSON serialization
+        if "_id" in alert:
+            alert["_id"] = str(alert["_id"])
+        if "timestamp" in alert:
+            alert["timestamp"] = alert["timestamp"].isoformat()
+        
         return alert
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving alert: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching alert: {str(e)}")
 
-@router.put("/{alert_id}", response_model=Alert)
+@router.post("/", response_model=Dict[str, Any])
+async def create_alert(
+    alert: AlertCreate,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new alert"""
+    try:
+        # Generate alert ID
+        alert_id = f"AL-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
+        
+        # Create alert document
+        alert_doc = {
+            "alert_id": alert_id,
+            "timestamp": datetime.now(timezone.utc),
+            "violation_type": alert.violation_type,
+            "severity_level": alert.severity_level,
+            "description": alert.description,
+            "confidence_score": alert.confidence_score,
+            "location_id": alert.location_id,
+            "camera_id": alert.camera_id,
+            "primary_object": alert.primary_object.dict(),
+            "snapshot_url": alert.snapshot_url,
+            "status": AlertStatus.NEW,
+            "assigned_to": None,
+            "resolution_notes": None
+        }
+        
+        # Insert into database
+        result = await db.alerts.insert_one(alert_doc)
+        
+        # Return created alert
+        alert_doc["_id"] = str(result.inserted_id)
+        alert_doc["timestamp"] = alert_doc["timestamp"].isoformat()
+        
+        return alert_doc
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating alert: {str(e)}")
+
+@router.put("/{alert_id}", response_model=Dict[str, Any])
 async def update_alert(
     alert_id: str,
-    update_data: AlertUpdate,
+    alert_update: AlertUpdate,
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Update an alert."""
+    """Update an existing alert"""
     try:
-        # Check if alert exists
-        existing_alert = await alert_service.get_alert(alert_id)
-        if not existing_alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Alert not found"
-            )
+        # Build update fields
+        update_fields = {}
         
-        # Update alert
-        updated_alert = await alert_service.update_alert(alert_id, update_data)
-        if not updated_alert:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update alert"
-            )
+        if alert_update.status is not None:
+            update_fields["status"] = alert_update.status
+        if alert_update.assigned_to is not None:
+            update_fields["assigned_to"] = alert_update.assigned_to
+        if alert_update.resolution_notes is not None:
+            update_fields["resolution_notes"] = alert_update.resolution_notes
+        
+        update_fields["updated_at"] = datetime.now(timezone.utc)
+        
+        # Update alert in database
+        result = await db.alerts.update_one(
+            {"alert_id": alert_id},
+            {"$set": update_fields}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        
+        # Return updated alert
+        updated_alert = await db.alerts.find_one({"alert_id": alert_id})
+        
+        if "_id" in updated_alert:
+            updated_alert["_id"] = str(updated_alert["_id"])
+        if "timestamp" in updated_alert:
+            updated_alert["timestamp"] = updated_alert["timestamp"].isoformat()
         
         return updated_alert
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating alert: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error updating alert: {str(e)}")
 
 @router.delete("/{alert_id}")
 async def delete_alert(
     alert_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Delete an alert."""
+    """Delete an alert"""
     try:
-        # Check if alert exists
-        existing_alert = await alert_service.get_alert(alert_id)
-        if not existing_alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Alert not found"
-            )
+        result = await db.alerts.delete_one({"alert_id": alert_id})
         
-        # Delete alert
-        success = await alert_service.delete_alert(alert_id)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete alert"
-            )
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Alert not found")
         
         return {"message": "Alert deleted successfully"}
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting alert: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error deleting alert: {str(e)}")
 
-@router.get("/active/list", response_model=List[Alert])
-async def get_active_alerts(
+@router.get("/recent/active", response_model=List[Dict[str, Any]])
+async def get_recent_active_alerts(
+    limit: int = Query(10, ge=1, le=100),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get all active (non-resolved) alerts."""
+    """Get recent active alerts"""
     try:
-        alerts = await alert_service.get_active_alerts()
+        # Get alerts from last 24 hours with status New or In Progress
+        yesterday = datetime.now(timezone.utc) - timedelta(hours=24)
+        
+        cursor = db.alerts.find({
+            "timestamp": {"$gte": yesterday},
+            "status": {"$in": ["New", "In Progress"]}
+        }).sort("timestamp", -1).limit(limit)
+        
+        alerts = await cursor.to_list(length=limit)
+        
+        # Convert ObjectId to string for JSON serialization
+        for alert in alerts:
+            if "_id" in alert:
+                alert["_id"] = str(alert["_id"])
+            if "timestamp" in alert:
+                alert["timestamp"] = alert["timestamp"].isoformat()
+        
         return alerts
+        
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving active alerts: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching recent alerts: {str(e)}")
 
-@router.get("/camera/{camera_id}", response_model=List[Alert])
-async def get_alerts_by_camera(
-    camera_id: str,
-    limit: int = Query(50, ge=1, le=1000),
+@router.get("/summary/status", response_model=Dict[str, Any])
+async def get_alerts_status_summary(
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get alerts for a specific camera."""
+    """Get summary of alerts by status"""
     try:
-        alerts = await alert_service.get_alerts_by_camera(camera_id, limit)
-        return alerts
+        # Aggregate alerts by status
+        pipeline = [
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        
+        status_summary = await db.alerts.aggregate(pipeline).to_list(length=10)
+        
+        # Convert to dictionary format
+        status_dict = {item["_id"]: item["count"] for item in status_summary}
+        
+        return {
+            "total_alerts": sum(status_dict.values()),
+            "by_status": status_dict
+        }
+        
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving camera alerts: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching status summary: {str(e)}")
 
-@router.get("/location/{location_id}", response_model=List[Alert])
-async def get_alerts_by_location(
-    location_id: str,
-    limit: int = Query(100, ge=1, le=1000),
+@router.get("/summary/severity", response_model=Dict[str, Any])
+async def get_alerts_severity_summary(
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get alerts for a specific location."""
+    """Get summary of alerts by severity"""
     try:
-        alerts = await alert_service.get_alerts_by_location(location_id, limit)
-        return alerts
+        # Aggregate alerts by severity
+        pipeline = [
+            {"$group": {"_id": "$severity_level", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        
+        severity_summary = await db.alerts.aggregate(pipeline).to_list(length=10)
+        
+        # Convert to dictionary format
+        severity_dict = {item["_id"]: item["count"] for item in severity_summary}
+        
+        return {
+            "total_alerts": sum(severity_dict.values()),
+            "by_severity": severity_dict
+        }
+        
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving location alerts: {str(e)}"
-        )
-
-@router.post("/{alert_id}/assign")
-async def assign_alert(
-    alert_id: str,
-    user_id: str,
-    current_user: User = Depends(get_current_active_user)
-):
-    """Assign an alert to a user."""
-    try:
-        # Check if alert exists
-        existing_alert = await alert_service.get_alert(alert_id)
-        if not existing_alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Alert not found"
-            )
-        
-        # Assign alert
-        updated_alert = await alert_service.assign_alert(alert_id, user_id)
-        if not updated_alert:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to assign alert"
-            )
-        
-        return {"message": "Alert assigned successfully", "alert": updated_alert}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error assigning alert: {str(e)}"
-        )
-
-@router.post("/{alert_id}/resolve")
-async def resolve_alert(
-    alert_id: str,
-    resolution_notes: str,
-    current_user: User = Depends(get_current_active_user)
-):
-    """Mark an alert as resolved."""
-    try:
-        # Check if alert exists
-        existing_alert = await alert_service.get_alert(alert_id)
-        if not existing_alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Alert not found"
-            )
-        
-        # Resolve alert
-        updated_alert = await alert_service.resolve_alert(alert_id, resolution_notes)
-        if not updated_alert:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to resolve alert"
-            )
-        
-        return {"message": "Alert resolved successfully", "alert": updated_alert}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error resolving alert: {str(e)}"
-        )
-
-@router.post("/{alert_id}/dismiss")
-async def dismiss_alert(
-    alert_id: str,
-    dismissal_reason: str,
-    current_user: User = Depends(get_current_active_user)
-):
-    """Dismiss an alert."""
-    try:
-        # Check if alert exists
-        existing_alert = await alert_service.get_alert(alert_id)
-        if not existing_alert:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Alert not found"
-            )
-        
-        # Dismiss alert
-        updated_alert = await alert_service.dismiss_alert(alert_id, dismissal_reason)
-        if not updated_alert:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to dismiss alert"
-            )
-        
-        return {"message": "Alert dismissed successfully", "alert": updated_alert}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error dismissing alert: {str(e)}"
-        )
-
-@router.get("/statistics/summary")
-async def get_alert_statistics(
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Get alert statistics summary."""
-    try:
-        stats = await alert_service.get_alert_statistics(start_date, end_date)
-        return stats
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving alert statistics: {str(e)}"
-        )
-
-@router.get("/recent/24h")
-async def get_recent_alerts_24h(
-    current_user: User = Depends(get_current_active_user)
-):
-    """Get alerts from the last 24 hours."""
-    try:
-        end_date = datetime.utcnow()
-        start_date = end_date - timedelta(hours=24)
-        
-        alerts = await alert_service.get_alerts(
-            start_date=start_date,
-            end_date=end_date,
-            limit=100
-        )
-        return alerts
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving recent alerts: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error fetching severity summary: {str(e)}")

@@ -26,15 +26,24 @@ export function LiveMonitoring() {
   // Load cameras data from backend
   const loadCamerasData = useCallback(async () => {
     try {
+      console.log('Loading cameras data...'); // Debug log
       setIsLoading(true);
       setHasError(false);
       
-      const camerasData = await monitoringApi.getCamerasMonitoringStatus();
+      // Add timeout protection
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 15000); // 15 second timeout
+      });
+      
+      const camerasDataPromise = monitoringApi.getCamerasMonitoringStatus();
+      const camerasData = await Promise.race([camerasDataPromise, timeoutPromise]) as CameraMonitoringStatus[];
+      
+      console.log('Cameras data loaded:', camerasData.length, 'cameras'); // Debug log
       setCameras(camerasData);
       
       // Update streaming and recording status for selected camera
       if (selectedCamera) {
-        const updatedCamera = camerasData.find(cam => cam.camera_id === selectedCamera.camera_id);
+        const updatedCamera = camerasData.find((cam: CameraMonitoringStatus) => cam.camera_id === selectedCamera.camera_id);
         if (updatedCamera) {
           setSelectedCamera(updatedCamera);
           setIsStreaming(updatedCamera.is_streaming);
@@ -44,10 +53,22 @@ export function LiveMonitoring() {
     } catch (error) {
       console.error('Failed to load cameras data:', error);
       setHasError(true);
+      
+      // Set empty cameras array on error to prevent infinite loading
+      setCameras([]);
+      
+      // Log additional error details for debugging
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCamera]);
+  }, []); // Remove all dependencies to prevent loops
 
   // Load recordings for selected camera
   const loadRecordings = useCallback(async (cameraId: string) => {
@@ -60,8 +81,21 @@ export function LiveMonitoring() {
   }, []);
 
   useEffect(() => {
+    console.log('Component mounted, loading cameras data...'); // Debug log
     loadCamerasData();
   }, [loadCamerasData]);
+
+  // Update selected camera status when cameras data changes
+  useEffect(() => {
+    if (selectedCamera && cameras.length > 0) {
+      const updatedCamera = cameras.find(cam => cam.camera_id === selectedCamera.camera_id);
+      if (updatedCamera) {
+        setSelectedCamera(updatedCamera);
+        setIsStreaming(updatedCamera.is_streaming);
+        setIsRecording(updatedCamera.is_recording);
+      }
+    }
+  }, [cameras, selectedCamera]);
 
   useEffect(() => {
     // Subscribe to camera status updates
@@ -122,6 +156,16 @@ export function LiveMonitoring() {
       await loadRecordings(camera.camera_id);
     }
   }, [showRecordings, loadRecordings]);
+
+  const handleRefreshData = useCallback(async () => {
+    // Prevent multiple simultaneous API calls
+    if (isLoading) {
+      console.log('Already loading cameras data, skipping refresh...'); // Debug log
+      return;
+    }
+    console.log('Manual refresh requested'); // Debug log
+    await loadCamerasData();
+  }, [loadCamerasData, isLoading]);
 
   const toggleStreaming = useCallback(async () => {
     if (!selectedCamera) return;
@@ -261,12 +305,25 @@ export function LiveMonitoring() {
       <div className="py-8">
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">Failed to load cameras data</p>
-          <button 
-            onClick={loadCamerasData}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Retry
-          </button>
+          <p className="text-sm text-gray-400 mb-4">Check if the backend server is running at http://localhost:8000</p>
+          <div className="space-x-2">
+            <button 
+              onClick={loadCamerasData}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Retry
+            </button>
+            <button 
+              onClick={() => {
+                setHasError(false);
+                setCameras([]);
+                setIsLoading(false);
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Continue with Empty State
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -288,49 +345,76 @@ export function LiveMonitoring() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Cameras</h2>
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-2 text-gray-400 hover:text-gray-600"
-              >
-                <Settings className="h-5 w-5" />
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleRefreshData}
+                  disabled={isLoading}
+                  className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Refresh cameras data"
+                >
+                  {isLoading ? (
+                    <svg className="h-5 w-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="p-2 text-gray-400 hover:text-gray-600"
+                  title="Camera settings"
+                >
+                  <Settings className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             
             <div className="space-y-3">
-              {cameras.map((camera) => (
-                <div
-                  key={camera.camera_id}
-                  onClick={() => handleCameraSelect(camera)}
-                  className={cn(
-                    'p-3 rounded-lg border cursor-pointer transition-colors',
-                    selectedCamera?.camera_id === camera.camera_id
-                      ? 'border-primary-300 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-900">{camera.name}</span>
-                    {getStatusIcon(camera.status)}
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">{camera.location}</p>
-                  <div className="flex items-center justify-between">
-                    <span className={cn(
-                      'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border',
-                      getStatusColor(camera.status)
-                    )}>
-                      {camera.status}
-                    </span>
-                    <div className="flex space-x-1">
-                      {camera.is_streaming && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      )}
-                      {camera.is_recording && (
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      )}
+              {cameras.length === 0 ? (
+                <div className="text-center py-6">
+                  <Camera className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-500">No cameras available</p>
+                  <p className="text-xs text-gray-400">Check backend connection or add cameras</p>
+                </div>
+              ) : (
+                cameras.map((camera) => (
+                  <div
+                    key={camera.camera_id}
+                    onClick={() => handleCameraSelect(camera)}
+                    className={cn(
+                      'p-3 rounded-lg border cursor-pointer transition-colors',
+                      selectedCamera?.camera_id === camera.camera_id
+                        ? 'border-primary-300 bg-primary-50'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-900">{camera.name}</span>
+                      {getStatusIcon(camera.status)}
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">{camera.location}</p>
+                    <div className="flex items-center justify-between">
+                      <span className={cn(
+                        'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border',
+                        getStatusColor(camera.status)
+                      )}>
+                        {camera.status}
+                      </span>
+                      <div className="flex space-x-1">
+                        {camera.is_streaming && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        )}
+                        {camera.is_recording && (
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

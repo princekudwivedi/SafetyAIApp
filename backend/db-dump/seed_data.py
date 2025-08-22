@@ -59,7 +59,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_001",
         "site_id": "SITE_001",
         "camera_name": "Main Entrance Camera",
-        "stream_url": "rtsp://192.168.1.101:554/stream1",
+        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=90),
         "settings": {
@@ -75,7 +75,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_002",
         "site_id": "SITE_001",
         "camera_name": "Construction Zone A",
-        "stream_url": "rtsp://192.168.1.102:554/stream1",
+        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=75),
         "settings": {
@@ -91,7 +91,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_003",
         "site_id": "SITE_001",
         "camera_name": "Construction Zone B",
-        "stream_url": "rtsp://192.168.1.103:554/stream1",
+        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=60),
         "settings": {
@@ -107,7 +107,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_004",
         "site_id": "SITE_002",
         "camera_name": "Bridge Foundation",
-        "stream_url": "rtsp://192.168.2.101:554/stream1",
+        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=45),
         "settings": {
@@ -123,7 +123,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_005",
         "site_id": "SITE_003",
         "camera_name": "Mall Entrance",
-        "stream_url": "rtsp://192.168.3.101:554/stream1",
+        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=30),
         "settings": {

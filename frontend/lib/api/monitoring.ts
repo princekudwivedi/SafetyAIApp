@@ -61,6 +61,11 @@ export const monitoringApi = {
     return response.data;
   },
 
+  // Get live video stream URL for a camera
+  getLiveVideoStreamUrl(cameraId: string): string {
+    return `${apiClient.defaults.baseURL}/api/v1/video/live/${cameraId}`;
+  },
+
   // Stop video streaming for a camera
   async stopVideoStream(cameraId: string): Promise<StreamResponse> {
     const response = await apiClient.post(`/api/v1/video/stop/${cameraId}`);

@@ -258,21 +258,37 @@ class VideoService:
     
     async def get_frame_from_camera(self, camera_id: str) -> Optional[np.ndarray]:
         """Get a single frame from a camera."""
-        if camera_id not in self.active_streams:
-            return None
-        
         try:
-            stream_url = self.active_streams[camera_id]["stream_url"]
+            # Get camera info from database to get stream URL
+            from app.core.database import get_database
+            database = get_database()
+            camera_doc = await database.cameras.find_one({"camera_id": camera_id})
+            
+            if not camera_doc:
+                logger.error(f"Camera {camera_id} not found in database")
+                return None
+            
+            stream_url = camera_doc.get("stream_url")
+            if not stream_url:
+                logger.error(f"No stream URL for camera {camera_id}")
+                return None
+            
+            logger.info(f"Attempting to get frame from {stream_url} for camera {camera_id}")
+            
             cap = cv2.VideoCapture(stream_url)
             
             if not cap.isOpened():
+                logger.error(f"Failed to open stream: {stream_url}")
                 return None
             
             ret, frame = cap.read()
             cap.release()
             
             if ret:
+                logger.info(f"Successfully read frame from camera {camera_id}")
                 return cv2.resize(frame, (settings.FRAME_WIDTH, settings.FRAME_HEIGHT))
+            else:
+                logger.warning(f"Failed to read frame from camera {camera_id}")
             
         except Exception as e:
             logger.error(f"Error getting frame from camera {camera_id}: {e}")

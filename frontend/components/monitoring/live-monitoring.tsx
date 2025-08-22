@@ -17,6 +17,7 @@ export function LiveMonitoring() {
   const [recordings, setRecordings] = useState<RecordingInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
   
   // Refs for video element and recording
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -176,28 +177,51 @@ export function LiveMonitoring() {
         await monitoringApi.stopVideoStream(selectedCamera.camera_id);
         setIsStreaming(false);
         
-        // Stop local video if available
+        // Stop video stream
         if (videoRef.current) {
-          videoRef.current.srcObject = null;
+          videoRef.current.src = '';
+          videoRef.current.load();
         }
       } else {
         // Start streaming
         await monitoringApi.startVideoStream(selectedCamera.camera_id);
         setIsStreaming(true);
         
-        // Start local video stream if possible
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play();
-          }
-        } catch (error) {
-          console.log('Local video stream not available, using backend stream');
+        // Start backend video stream
+        if (videoRef.current) {
+          // Use the backend live video stream endpoint
+          const streamUrl = monitoringApi.getLiveVideoStreamUrl(selectedCamera.camera_id);
+          console.log('Starting video stream from:', streamUrl);
+          
+          setIsVideoLoading(true);
+          
+          // Add event listeners for better error handling
+          videoRef.current.onerror = (error) => {
+            console.error('Video stream error:', error);
+            setIsStreaming(false);
+            setIsVideoLoading(false);
+          };
+          
+          videoRef.current.onloadstart = () => {
+            console.log('Video stream loading started');
+          };
+          
+          videoRef.current.oncanplay = () => {
+            console.log('Video stream can play');
+            setIsVideoLoading(false);
+          };
+          
+          videoRef.current.src = streamUrl;
+          videoRef.current.play().catch(error => {
+            console.error('Failed to play video stream:', error);
+            setIsStreaming(false);
+            setIsVideoLoading(false);
+          });
         }
       }
     } catch (error) {
       console.error('Failed to toggle streaming:', error);
+      setIsStreaming(false);
     }
   }, [selectedCamera, isStreaming]);
 
@@ -457,25 +481,37 @@ export function LiveMonitoring() {
 
                 {/* Video Display */}
                 <div className="p-4">
-                  <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                    {isStreaming ? (
-                      <video
-                        ref={videoRef}
-                        className="w-full h-full object-cover"
-                        autoPlay
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center text-white">
-                          <Camera className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                          <p className="text-lg font-medium">Camera Ready</p>
-                          <p className="text-sm text-gray-400">Click play to start streaming</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                                     <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                     {isStreaming ? (
+                       <>
+                         {isVideoLoading && (
+                           <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-10">
+                             <div className="text-center text-white">
+                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+                               <p className="text-sm">Loading video stream...</p>
+                             </div>
+                           </div>
+                         )}
+                         <video
+                           ref={videoRef}
+                           className="w-full h-full object-cover"
+                           autoPlay
+                           muted
+                           playsInline
+                           controls
+                           style={{ objectFit: 'contain' }}
+                         />
+                       </>
+                     ) : (
+                       <div className="w-full h-full flex items-center justify-center">
+                         <div className="text-center text-white">
+                           <Camera className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                           <p className="text-lg font-medium">Camera Ready</p>
+                           <p className="text-sm text-gray-400">Click play to start streaming</p>
+                         </div>
+                       </div>
+                     )}
+                   </div>
 
                   {/* Controls */}
                   <div className="flex items-center justify-between mt-4">
@@ -502,21 +538,52 @@ export function LiveMonitoring() {
                         )}
                       </button>
 
-                      <button
-                        onClick={toggleRecording}
-                        disabled={!isStreaming}
-                        className={cn(
-                          'flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors',
-                          isRecording
-                            ? 'bg-red-600 text-white hover:bg-red-700'
-                            : isStreaming
-                            ? 'bg-gray-600 text-white hover:bg-gray-700'
-                            : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                        )}
-                      >
-                        <Square className="h-4 w-4" />
-                        <span>{isRecording ? 'Stop Recording' : 'Record'}</span>
-                      </button>
+                                             <button
+                         onClick={toggleRecording}
+                         disabled={!isStreaming}
+                         className={cn(
+                           'flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors',
+                           isRecording
+                             ? 'bg-red-600 text-white hover:bg-red-700'
+                             : isStreaming
+                             ? 'bg-gray-600 text-white hover:bg-gray-700'
+                             : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                         )}
+                       >
+                         <Square className="h-4 w-4" />
+                         <span>{isRecording ? 'Stop Recording' : 'Record'}</span>
+                       </button>
+                       
+                                               <button
+                          onClick={async () => {
+                            if (selectedCamera) {
+                              console.log('Testing RTSP connection for:', selectedCamera.stream_url);
+                              try {
+                                const response = await fetch(`/api/v1/cameras/${selectedCamera.camera_id}/test`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                  }
+                                });
+                                const result = await response.json();
+                                console.log('Camera test result:', result);
+                                if (result.stream_available) {
+                                  alert('RTSP connection successful!');
+                                } else {
+                                  alert('RTSP connection failed: ' + result.message);
+                                }
+                              } catch (error) {
+                                console.error('Camera test failed:', error);
+                                alert('Camera test failed: ' + error);
+                              }
+                            }
+                          }}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                          title="Test RTSP connection"
+                        >
+                          Test RTSP
+                        </button>
                     </div>
 
                     <div className="text-sm text-gray-500">

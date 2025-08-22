@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
 import cv2
@@ -374,4 +374,158 @@ async def delete_camera(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting camera: {str(e)}"
+        )
+
+@router.post("/record/start/{camera_id}")
+async def start_recording(
+    camera_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Start recording for a specific camera."""
+    try:
+        # Get camera info
+        database = get_database()
+        camera_doc = await database.cameras.find_one({"camera_id": camera_id})
+        if not camera_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Camera not found"
+            )
+        
+        # Check if camera is active
+        if camera_doc.get("status") != "Active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Camera is not active"
+            )
+        
+        # Start recording
+        recording_info = await video_service.start_recording(
+            camera_id=camera_id,
+            stream_url=camera_doc["stream_url"],
+            location_id=camera_doc["site_id"]
+        )
+        
+        return {
+            "message": f"Recording started for camera {camera_id}",
+            "recording_id": recording_info.get("recording_id"),
+            "start_time": recording_info.get("start_time")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error starting recording: {str(e)}"
+        )
+
+@router.post("/record/stop/{camera_id}")
+async def stop_recording(
+    camera_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Stop recording for a specific camera."""
+    try:
+        # Stop recording
+        recording_info = await video_service.stop_recording(camera_id)
+        
+        return {
+            "message": f"Recording stopped for camera {camera_id}",
+            "recording_id": recording_info.get("recording_id"),
+            "duration": recording_info.get("duration"),
+            "file_path": recording_info.get("file_path")
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error stopping recording: {str(e)}"
+        )
+
+@router.get("/record/status/{camera_id}")
+async def get_recording_status(
+    camera_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get the recording status for a specific camera."""
+    try:
+        status = video_service.get_recording_status(camera_id)
+        if status is None:
+            return {
+                "camera_id": camera_id,
+                "is_recording": False,
+                "message": "No active recording"
+            }
+        
+        return {
+            "camera_id": camera_id,
+            "is_recording": True,
+            "recording_id": status.get("recording_id"),
+            "start_time": status.get("start_time"),
+            "duration": status.get("duration")
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting recording status: {str(e)}"
+        )
+
+@router.get("/record/list/{camera_id}")
+async def get_recording_list(
+    camera_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get list of recordings for a specific camera."""
+    try:
+        recordings = await video_service.get_recording_list(
+            camera_id=camera_id,
+            skip=skip,
+            limit=limit
+        )
+        
+        return {
+            "camera_id": camera_id,
+            "recordings": recordings,
+            "total": len(recordings)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting recording list: {str(e)}"
+        )
+
+@router.get("/record/download/{recording_id}")
+async def download_recording(
+    recording_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Download a specific recording file."""
+    try:
+        recording_file = await video_service.get_recording_file(recording_id)
+        if not recording_file:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recording file not found"
+            )
+        
+        # Return file for download
+        return StreamingResponse(
+            open(recording_file["file_path"], "rb"),
+            media_type="video/mp4",
+            headers={
+                "Content-Disposition": f"attachment; filename={recording_file['filename']}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error downloading recording: {str(e)}"
         )

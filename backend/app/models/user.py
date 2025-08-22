@@ -2,6 +2,7 @@ from app.models.base import BaseDBModel, PyObjectId
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 from enum import Enum
+from datetime import datetime
 
 class UserRole(str, Enum):
     ADMINISTRATOR = "Administrator"
@@ -26,9 +27,12 @@ class UserUpdate(BaseModel):
     site_id: Optional[str] = None
     is_active: Optional[bool] = None
 
-class UserInDB(UserBase, BaseDBModel):
+class UserInDB(UserBase):
     password_hash: str
-    site_id: Optional[PyObjectId] = None
+    site_id: Optional[str] = None
+    id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class User(UserBase, BaseDBModel):
     pass

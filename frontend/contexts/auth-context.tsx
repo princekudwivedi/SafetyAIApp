@@ -67,58 +67,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Check dummy credentials first
-      const dummyUser = DUMMY_CREDENTIALS.find(
-        cred => cred.username === credentials.username && cred.password === credentials.password
-      );
+      console.log('🔐 Attempting login with credentials:', credentials.username);
+      console.log('🌐 API Client baseURL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1');
       
-      if (dummyUser) {
-        // Create dummy user object
-        const userData: User = {
-          id: `dummy-${Date.now()}`,
-          username: dummyUser.username,
-          email: `${dummyUser.username}@safetyai.com`,
-          role: dummyUser.role as any,
-          site_id: 'site-001',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        // Store dummy token and session data
-        const dummyToken = `dummy-token-${Date.now()}`;
-        const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
-        
-        localStorage.setItem('auth_token', dummyToken);
-        localStorage.setItem('auth_session', JSON.stringify({
-          user: userData,
-          expiresAt: expiresAt,
-          createdAt: Date.now()
-        }));
-        
-        // Set user
-        setUser(userData);
-        return;
-      }
+      // Use real backend authentication
+      const response = await authApi.login(credentials);
       
-      // If not dummy credentials, try real API
-      try {
-        const response = await authApi.login(credentials);
-        const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
-        
+      console.log('✅ Login response received:', response);
+      
+      if (response.access_token) {
+        // Store real JWT token
         localStorage.setItem('auth_token', response.access_token);
-        localStorage.setItem('auth_session', JSON.stringify({
-          expiresAt: expiresAt,
-          createdAt: Date.now()
-        }));
+        console.log('💾 Auth token stored in localStorage');
         
-        await refreshUser();
-      } catch (apiError) {
-        console.error('API login failed:', apiError);
-        throw new Error('Invalid credentials. Please use one of the demo accounts.');
+        // Get user information from the token or fetch user details
+        try {
+          console.log('👤 Fetching user details...');
+          const userResponse = await authApi.getCurrentUser();
+          const userData = userResponse;
+          console.log('👤 User details received:', userData);
+          
+          // Store session data
+          const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
+          localStorage.setItem('auth_session', JSON.stringify({
+            user: userData,
+            expiresAt: expiresAt,
+            createdAt: Date.now()
+          }));
+          
+          // Set user
+          setUser(userData);
+        } catch (userError) {
+          console.error('❌ Failed to get user details:', userError);
+          // If we can't get user details, create a basic user object from credentials
+          const userData: User = {
+            id: `user-${Date.now()}`,
+            username: credentials.username,
+            email: `${credentials.username}@safetyai.com`,
+            role: 'Operator' as any, // Default role
+            site_id: 'site-001',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          
+          const expiresAt = Date.now() + (24 * 60 * 60 * 1000);
+          localStorage.setItem('auth_session', JSON.stringify({
+            user: userData,
+            expiresAt: expiresAt,
+            createdAt: Date.now()
+          }));
+          
+          // Set user
+          setUser(userData);
+        }
+      } else {
+        throw new Error('No access token received');
       }
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('❌ Login failed:', error);
       throw error;
     } finally {
       setIsLoading(false);

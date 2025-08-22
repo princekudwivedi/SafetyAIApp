@@ -43,6 +43,53 @@ async def get_cameras(
             detail=f"Error retrieving cameras: {str(e)}"
         )
 
+@router.get("/monitoring/status", response_model=List[dict])
+async def get_cameras_monitoring_status(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all cameras with their monitoring status for live monitoring page."""
+    try:
+        database = get_database()
+        
+        # Get all cameras
+        cursor = database.cameras.find({})
+        cameras = []
+        
+        async for camera_doc in cursor:
+            # Get site information
+            site_doc = await database.sites.find_one({"site_id": camera_doc["site_id"]})
+            site_name = site_doc["site_name"] if site_doc else "Unknown Site"
+            
+            # Get streaming status
+            from app.services.video_service import VideoService
+            video_service = VideoService()
+            stream_status = video_service.get_stream_status(camera_doc["camera_id"])
+            recording_status = video_service.get_recording_status(camera_doc["camera_id"])
+            
+            camera_info = {
+                "camera_id": camera_doc["camera_id"],
+                "name": camera_doc["camera_name"],
+                "location": site_name,
+                "zone": camera_doc.get("location_description", "Unknown Zone"),
+                "status": camera_doc["status"],
+                "stream_url": camera_doc["stream_url"],
+                "is_streaming": stream_status is not None,
+                "is_recording": recording_status is not None,
+                "last_frame": None,  # Will be updated via WebSocket
+                "installation_date": camera_doc["installation_date"].isoformat() if camera_doc.get("installation_date") else None,
+                "settings": camera_doc.get("settings", {})
+            }
+            
+            cameras.append(camera_info)
+        
+        return cameras
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving cameras monitoring status: {str(e)}"
+        )
+
 @router.get("/{camera_id}", response_model=Camera)
 async def get_camera(
     camera_id: str,

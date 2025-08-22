@@ -18,8 +18,10 @@ DATABASE_NAME = "safety_ai_db"
 
 # Helper function to hash passwords
 def hash_password(password: str) -> str:
-    """Hash a password using SHA-256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash a password using bcrypt"""
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    return pwd_context.hash(password)
 
 # Sample data
 SITES_DATA = [

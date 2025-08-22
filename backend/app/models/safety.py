@@ -109,7 +109,7 @@ class SiteUpdate(BaseModel):
     contact_phone: Optional[str] = None
     is_active: Optional[bool] = None
 
-class Camera(BaseDBModel):
+class Camera(BaseModel):
     camera_id: str = Field(..., unique=True)
     site_id: str
     camera_name: str
@@ -118,6 +118,11 @@ class Camera(BaseDBModel):
     installation_date: datetime
     settings: Dict[str, Any] = {}
     location_description: Optional[str] = None
+    
+    # Optional fields from BaseDBModel
+    id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class CameraCreate(BaseModel):
     site_id: str

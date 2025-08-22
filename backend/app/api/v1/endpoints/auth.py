@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from app.core.config import settings
 from app.core.database import get_database
-from app.models.user import User, UserLogin, Token, TokenData
+from app.models.user import User, UserInDB, UserLogin, Token, TokenData
 from app.models.base import PyObjectId
 
 router = APIRouter()
@@ -19,24 +19,26 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    is_valid = pwd_context.verify(plain_password, hashed_password)
+    return is_valid
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
     return pwd_context.hash(password)
 
-async def get_user(username: str) -> Optional[User]:
+async def get_user(username: str) -> Optional[UserInDB]:
     """Get a user by username."""
     try:
         database = get_database()
         user_doc = await database.users.find_one({"username": username})
         if user_doc:
-            return User(**user_doc)
+            return UserInDB(**user_doc)
     except Exception as e:
+        print(f"Error creating UserInDB: {e}")
         return None
     return None
 
-async def authenticate_user(username: str, password: str) -> Optional[User]:
+async def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
     """Authenticate a user."""
     user = await get_user(username)
     if not user:
@@ -56,7 +58,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
     """Get the current authenticated user."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -77,7 +79,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         raise credentials_exception
     return user
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
     """Get the current active user."""
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")

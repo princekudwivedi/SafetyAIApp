@@ -250,6 +250,12 @@ class VideoService:
         """Get status of all active streams."""
         return self.active_streams.copy()
     
+    def get_recording_status(self, camera_id: str) -> Optional[Dict[str, Any]]:
+        """Get the recording status of a camera."""
+        # For now, return None as recording is not implemented yet
+        # This could be extended to track actual recording status
+        return None
+    
     async def get_frame_from_camera(self, camera_id: str) -> Optional[np.ndarray]:
         """Get a single frame from a camera."""
         if camera_id not in self.active_streams:

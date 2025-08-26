@@ -9,7 +9,10 @@ import { ReportsPage } from '@/components/reports/reports-page';
 import { SitesPage } from '@/components/sites/sites-page';
 import { CamerasPage } from '@/components/cameras/cameras-page';
 import UsersPage from '@/components/users/users-page';
-import { SettingsPage } from '@/components/settings/settings-page';
+import { SettingsPage as SystemSettingsPage } from '@/components/settings/settings-page';
+import { SettingsPage as UserSettingsPage } from '@/components/dashboard/settings';
+import { UserProfile } from '@/components/dashboard/user-profile';
+import { AccountSecurity } from '@/components/dashboard/account-security';
 
 export function DashboardContent() {
   const pathname = usePathname();
@@ -31,7 +34,13 @@ export function DashboardContent() {
       case '/dashboard/users':
         return <UsersPage />;
       case '/dashboard/settings':
-        return <SettingsPage />;
+        return <UserSettingsPage />;
+      case '/dashboard/system-settings':
+        return <SystemSettingsPage />;
+      case '/dashboard/profile':
+        return <UserProfile />;
+      case '/dashboard/account':
+        return <AccountSecurity />;
       default:
         return <DashboardOverview />;
     }

@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { AlertTriangle, Clock, MapPin, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AlertsSummary } from '@/lib/api/dashboard';
+import { useRouter } from 'next/navigation';
 
 interface Alert {
   id: string;
@@ -35,15 +36,22 @@ const statusColors = {
 };
 
 export function RecentAlerts({ alertsSummary, isLoading }: RecentAlertsProps) {
+  const router = useRouter();
+  
   // Process alerts data from props using useMemo to prevent unnecessary recalculations
   const alerts = useMemo((): Alert[] => {
+    console.log('🔄 Processing recent alerts:', alertsSummary); // Debug log
+    
     if (!alertsSummary) {
+      console.log('❌ No alerts summary provided');
       return [];
     }
 
     try {
+      console.log('📊 Recent alerts from API:', alertsSummary.recent_alerts); // Debug log
+      
       // Transform API data to component format
-      return alertsSummary.recent_alerts.slice(0, 5).map(apiAlert => ({
+      const transformedAlerts = alertsSummary.recent_alerts.slice(0, 5).map(apiAlert => ({
         id: apiAlert.alert_id,
         type: apiAlert.violation_type,
         severity: apiAlert.severity_level as 'High' | 'Medium' | 'Low',
@@ -53,8 +61,12 @@ export function RecentAlerts({ alertsSummary, isLoading }: RecentAlertsProps) {
         timestamp: new Date(apiAlert.timestamp).toLocaleString(),
         status: apiAlert.status as 'New' | 'Assigned' | 'Resolved' | 'Dismissed',
       }));
+      
+      console.log('✅ Transformed alerts:', transformedAlerts); // Debug log
+      return transformedAlerts;
     } catch (error) {
       console.error('Error processing alerts data:', error);
+      console.log('Debug - alertsSummary:', alertsSummary); // Debug log
       return [];
     }
   }, [alertsSummary]);
@@ -97,7 +109,10 @@ export function RecentAlerts({ alertsSummary, isLoading }: RecentAlertsProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium text-gray-900">Recent Alerts</h3>
-        <button className="text-sm text-primary-600 hover:text-primary-500">
+        <button 
+          onClick={() => router.push('/dashboard/alerts')}
+          className="text-sm text-primary-600 hover:text-primary-500"
+        >
           View All
         </button>
       </div>
@@ -111,7 +126,8 @@ export function RecentAlerts({ alertsSummary, isLoading }: RecentAlertsProps) {
           alerts.map((alert) => (
             <div
               key={alert.id}
-              className="p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+              className="p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors cursor-pointer"
+              onClick={() => router.push(`/dashboard/alerts?alert=${alert.id}`)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">

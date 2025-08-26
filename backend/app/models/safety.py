@@ -81,7 +81,7 @@ class AlertCreate(BaseModel):
     snapshot_url: Optional[str] = None
 
 class AlertUpdate(BaseModel):
-    status: Optional[AlertStatus] = None
+    status: Optional[str] = None  # Accept both enum values and formatted strings
     assigned_to: Optional[str] = None
     resolution_notes: Optional[str] = None
 

@@ -5,6 +5,7 @@ import { useWebSocket } from '@/contexts/websocket-context';
 import { Camera, Play, Pause, Square, Settings, AlertTriangle, Wifi, WifiOff, Download, Clock, HardDrive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { monitoringApi, CameraMonitoringStatus, RecordingInfo } from '@/lib/api/monitoring';
+import { VideoUploadManager } from './video-upload-manager';
 
 export function LiveMonitoring() {
   const { subscribe, isConnected } = useWebSocket();
@@ -629,6 +630,17 @@ export function LiveMonitoring() {
                       </div>
                     </div>
                   )}
+
+                  {/* Video Upload Manager for Testing */}
+                  <div className="mt-6">
+                    <VideoUploadManager 
+                      selectedCamera={selectedCamera}
+                      onAlertGenerated={() => {
+                        // Refresh data when alerts are generated
+                        loadCamerasData();
+                      }}
+                    />
+                  </div>
                 </div>
               </>
             ) : (

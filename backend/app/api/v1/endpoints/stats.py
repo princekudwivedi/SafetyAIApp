@@ -65,6 +65,22 @@ async def get_dashboard_stats(
         medium_severity = await db.alerts.count_documents({"severity_level": "Medium"})
         low_severity = await db.alerts.count_documents({"severity_level": "Low"})
         
+        # Get all unique severity levels for filtering
+        severity_pipeline = [
+            {"$group": {"_id": "$severity_level"}},
+            {"$sort": {"_id": 1}}
+        ]
+        severity_levels_raw = await db.alerts.aggregate(severity_pipeline).to_list(length=10)
+        
+        # Convert severity levels to formatted values (same as alerts endpoint)
+        def format_enum_value(value: str) -> str:
+            """Convert enum values to consistent key format (e.g., 'High' -> 'high')"""
+            if not value:
+                return value
+            return value.lower().replace(' ', '_')
+        
+        severity_levels = [format_enum_value(item["_id"]) for item in severity_levels_raw]
+        
         # Get total cameras
         total_cameras = await db.cameras.count_documents({"status": "Active"})
         
@@ -78,6 +94,8 @@ async def get_dashboard_stats(
             safety_score = max(50, min(100, 100 - (resolved_percentage * 0.5)))
         
         # Get recent alerts for timeline - handle both string and datetime timestamps
+        print(f"🔍 Fetching recent alerts from {last_week.strftime('%Y-%m-%d')}")  # Debug log
+        
         recent_alerts_raw = await db.alerts.find(
             {
                 "$or": [
@@ -88,15 +106,17 @@ async def get_dashboard_stats(
             {"timestamp": 1, "violation_type": 1, "severity_level": 1, "status": 1}
         ).sort("timestamp", -1).limit(10).to_list(length=10)
         
-        # Convert ObjectId to string and handle datetime serialization
+        print(f"📊 Found {len(recent_alerts_raw)} recent alerts")  # Debug log
+        
+        # Convert ObjectId to string and handle datetime serialization with consistent formatting
         recent_alerts = []
         for alert in recent_alerts_raw:
             alert_dict = {
                 "alert_id": str(alert.get("_id")),
                 "timestamp": alert.get("timestamp").isoformat() if hasattr(alert.get("timestamp"), 'isoformat') else str(alert.get("timestamp")),
-                "violation_type": alert.get("violation_type"),
-                "severity_level": alert.get("severity_level"),
-                "status": alert.get("status")
+                "violation_type": format_enum_value(alert.get("violation_type")),
+                "severity_level": format_enum_value(alert.get("severity_level")),
+                "status": format_enum_value(alert.get("status"))
             }
             recent_alerts.append(alert_dict)
         
@@ -108,16 +128,18 @@ async def get_dashboard_stats(
         ]
         violation_types_raw = await db.alerts.aggregate(violation_types_pipeline).to_list(length=10)
         
-        # Convert ObjectId to string in violation types
+        # Convert ObjectId to string in violation types with consistent formatting
         violation_types = []
         for item in violation_types_raw:
             violation_types.append({
-                "_id": str(item.get("_id")),
+                "_id": format_enum_value(str(item.get("_id"))),
                 "count": item.get("count")
             })
         
         # Get weekly trend data - handle both string and datetime timestamps
         weekly_data = []
+        print(f"🔍 Generating weekly data for {now.strftime('%Y-%m-%d')}")  # Debug log
+        
         for i in range(7):
             date = now - timedelta(days=i)
             start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -140,14 +162,17 @@ async def get_dashboard_stats(
                 ]
             })
             
+            print(f"📅 {date.strftime('%Y-%m-%d')} ({date.strftime('%a')}): {day_alerts} alerts")  # Debug log
+            
             weekly_data.append({
                 "day": date.strftime("%a"),
                 "alerts": day_alerts
             })
         
         weekly_data.reverse()  # Reverse to show oldest to newest
+        print(f"📊 Weekly data generated: {weekly_data}")  # Debug log
         
-        return {
+        response_data = {
             "total_alerts": total_alerts,
             "today_alerts": today_alerts,
             "yesterday_alerts": yesterday_alerts,
@@ -163,8 +188,12 @@ async def get_dashboard_stats(
             "recent_alerts": recent_alerts,
             "violation_types": violation_types,
             "weekly_data": weekly_data,
+            "severity_levels": severity_levels,
             "last_updated": now.isoformat()
         }
+        
+        print(f"📤 Dashboard stats response: {response_data}")  # Debug log
+        return response_data
         
     except Exception as e:
         import traceback
@@ -209,41 +238,64 @@ async def get_alerts_summary(
             severity = alert.get("severity_level", "Unknown")
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
         
-        # Convert to arrays for frontend
+        # Convert to arrays for frontend with consistent formatting
+        def format_enum_value(value: str) -> str:
+            """Convert enum values to consistent key format (e.g., 'High' -> 'high')"""
+            if not value:
+                return value
+            return value.lower().replace(' ', '_')
+        
         for status, count in status_counts.items():
-            alerts_by_status.append({"status": status, "count": count})
+            alerts_by_status.append({"status": format_enum_value(status), "count": count})
         
         for severity, count in severity_counts.items():
-            alerts_by_severity.append({"severity": severity, "count": count})
+            alerts_by_severity.append({"severity": format_enum_value(severity), "count": count})
         
-        # Get recent alerts (last 10)
+        # Get recent alerts (last 5)
+        recent_start_date = end_date - timedelta(days=7)
+        print(f"🔍 Fetching recent alerts from {recent_start_date.strftime('%Y-%m-%d')}")  # Debug log
+        
         recent_alerts_raw = await db.alerts.find({
             "$or": [
-                {"timestamp": {"$gte": end_date - timedelta(days=7)}},
-                {"timestamp": {"$gte": (end_date - timedelta(days=7)).isoformat()}}
+                {"timestamp": {"$gte": recent_start_date}},
+                {"timestamp": {"$gte": recent_start_date.isoformat()}}
             ]
-        }).sort("timestamp", -1).limit(10).to_list(length=10)
+        }).sort("timestamp", -1).limit(5).to_list(length=5)
         
-        # Convert ObjectId to string and handle datetime serialization
+        print(f"📊 Found {len(recent_alerts_raw)} recent alerts in summary")  # Debug log
+        
+        # Convert ObjectId to string and handle datetime serialization with consistent formatting
         recent_alerts = []
         for alert in recent_alerts_raw:
             alert_dict = {
                 "alert_id": str(alert.get("_id")),
                 "timestamp": alert.get("timestamp").isoformat() if hasattr(alert.get("timestamp"), 'isoformat') else str(alert.get("timestamp")),
-                "violation_type": alert.get("violation_type"),
-                "severity_level": alert.get("severity_level"),
+                "violation_type": format_enum_value(alert.get("violation_type")),
+                "severity_level": format_enum_value(alert.get("severity_level")),
                 "description": alert.get("description", ""),
                 "camera_id": alert.get("camera_id", ""),
-                "status": alert.get("status"),
+                "status": format_enum_value(alert.get("status")),
                 "confidence_score": alert.get("confidence_score", 0)
             }
             recent_alerts.append(alert_dict)
         
-        return {
+        # Calculate weekly safety violations count
+        weekly_violations = await db.alerts.count_documents({
+            "$or": [
+                {"timestamp": {"$gte": end_date - timedelta(days=7)}},
+                {"timestamp": {"$gte": (end_date - timedelta(days=7)).isoformat()}}
+            ]
+        })
+        
+        response_data = {
             "alerts_by_status": alerts_by_status,
             "alerts_by_severity": alerts_by_severity,
-            "recent_alerts": recent_alerts
+            "recent_alerts": recent_alerts,
+            "weekly_violations": weekly_violations
         }
+        
+        print(f"📤 Alerts summary response: {response_data}")  # Debug log
+        return response_data
         
     except Exception as e:
         import traceback

@@ -21,6 +21,7 @@ export interface DashboardStats {
     _id: string;
     count: number;
   }>;
+  severity_levels: string[];
 }
 
 export interface RecentAlert {
@@ -44,6 +45,7 @@ export interface AlertsSummary {
     count: number;
   }>;
   recent_alerts: RecentAlert[];
+  weekly_violations: number;
 }
 
 export const dashboardApi = {

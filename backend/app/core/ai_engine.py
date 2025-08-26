@@ -127,21 +127,29 @@ class AIEngine:
                 
                 # Check if worker has hard hat
                 if not self._has_nearby_ppe(worker_center, ppe_items, ObjectType.HARD_HAT):
+                    logger.info(f"Creating hard hat violation alert for worker at {worker_center}")
                     alert = self._create_ppe_violation_alert(
                         worker, ObjectType.HARD_HAT, "No Hard Hat",
                         camera_id, location_id, frame
                     )
                     if alert:
+                        logger.info(f"Successfully created hard hat alert: {type(alert)}")
                         alerts.append(alert)
+                    else:
+                        logger.warning("Failed to create hard hat violation alert")
                 
                 # Check if worker has safety vest
                 if not self._has_nearby_ppe(worker_center, ppe_items, ObjectType.SAFETY_VEST):
+                    logger.info(f"Creating safety vest violation alert for worker at {worker_center}")
                     alert = self._create_ppe_violation_alert(
                         worker, ObjectType.SAFETY_VEST, "No Safety Vest",
                         camera_id, location_id, frame
                     )
                     if alert:
+                        logger.info(f"Successfully created safety vest alert: {type(alert)}")
                         alerts.append(alert)
+                    else:
+                        logger.warning("Failed to create safety vest violation alert")
                 
                 # Check proximity to machinery
                 for machine in machinery:
@@ -317,16 +325,87 @@ class AIEngine:
             logger.error(f"Error creating environmental hazard alert: {e}")
             return None
     
+    def analyze_frame(self, frame: np.ndarray, camera_id: str, 
+                     timestamp: datetime, frame_number: int = 0) -> Dict[str, Any]:
+        """Analyze a single frame for safety violations and return analysis results."""
+        try:
+            # Detect objects in the frame
+            detections = self.detect_objects(frame)
+            
+            if not detections:
+                return {
+                    "alert_required": False,
+                    "detections": [],
+                    "violations": [],
+                    "frame_number": frame_number
+                }
+            
+            # Analyze for safety violations
+            alerts = self.analyze_safety_violations(detections, frame, camera_id, "unknown")
+            
+            # Debug logging for alerts
+            logger.info(f"Generated {len(alerts)} alerts from safety analysis")
+            for i, alert in enumerate(alerts):
+                if alert is None:
+                    logger.warning(f"Alert {i} is None")
+                else:
+                    logger.info(f"Alert {i}: {type(alert)} - {alert}")
+            
+            # Determine if alert is required
+            alert_required = len(alerts) > 0
+            
+            # Get the most critical violation for immediate alerting
+            primary_violation = None
+            if alerts:
+                # Sort by severity and confidence
+                alerts.sort(key=lambda x: (
+                    self._get_severity_score(x.severity_level),
+                    x.confidence_score
+                ), reverse=True)
+                primary_violation = alerts[0]
+            
+            return {
+                "alert_required": alert_required,
+                "detections": detections,
+                "violations": alerts,
+                "primary_violation": primary_violation,
+                "frame_number": frame_number,
+                "timestamp": timestamp,
+                "camera_id": camera_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing frame: {e}")
+            return {
+                "alert_required": False,
+                "error": str(e),
+                "frame_number": frame_number
+            }
+    
+    def _get_severity_score(self, severity: SeverityLevel) -> int:
+        """Get numeric score for severity level for sorting."""
+        severity_scores = {
+            SeverityLevel.HIGH: 3,
+            SeverityLevel.MEDIUM: 2,
+            SeverityLevel.LOW: 1
+        }
+        return severity_scores.get(severity, 1)
+    
     def process_frame(self, frame: np.ndarray, camera_id: str, 
                      location_id: str) -> Tuple[List[Dict[str, Any]], List[AlertCreate]]:
-        """Process a single frame and return detections and alerts."""
-        # Detect objects
-        detections = self.detect_objects(frame)
-        
-        # Analyze safety violations
-        alerts = self.analyze_safety_violations(detections, frame, camera_id, location_id)
-        
-        return detections, alerts
+        """Process a frame and return detections and alerts (legacy method)."""
+        try:
+            # Detect objects
+            detections = self.detect_objects(frame)
+            
+            # Analyze for violations
+            alerts = self.analyze_safety_violations(detections, frame, camera_id, location_id)
+            
+            return detections, alerts
+            
+        except Exception as e:
+            logger.error(f"Error processing frame: {e}")
+            return [], []
     
     def draw_detections(self, frame: np.ndarray, 
                        detections: List[Dict[str, Any]]) -> np.ndarray:

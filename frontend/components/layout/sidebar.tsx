@@ -32,7 +32,10 @@ const navigation = [
   { name: 'Sites', href: '/dashboard/sites', icon: Building },
   { name: 'Cameras', href: '/dashboard/cameras', icon: Camera },
   { name: 'Users', href: '/dashboard/users', icon: Users },
+  { name: 'Profile', href: '/dashboard/profile', icon: Users },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'System Settings', href: '/dashboard/system-settings', icon: Settings },
+  { name: 'Account Security', href: '/dashboard/account', icon: Shield },
 ];
 
 export function Sidebar({ open, setOpen }: SidebarProps) {

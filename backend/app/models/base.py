@@ -5,14 +5,18 @@ from bson import ObjectId
 
 class PyObjectId(ObjectId):
     @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
+    def __get_pydantic_core_schema__(cls, source_type: Any, handler: Any) -> Any:
+        from pydantic_core import core_schema
+        return core_schema.field_plain_validator_function(
+            cls._validate,
+            field_name="_id"
+        )
+    
     @classmethod
-    def validate(cls, v):
+    def _validate(cls, v: Any, info: Any) -> "PyObjectId":
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
-        return ObjectId(v)
+        return cls(v)
 
     @classmethod
     def __get_pydantic_json_schema__(cls, field_schema: Any, field: Any) -> None:

@@ -48,6 +48,42 @@ export interface RecordingInfo {
   filename: string;
 }
 
+export interface VideoUploadResponse {
+  upload_id: string;
+  camera_id: string;
+  filename: string;
+  file_size: number;
+  status: string;
+  message: string;
+}
+
+export interface VideoProcessingResponse {
+  upload_id: string;
+  status: string;
+  message: string;
+}
+
+export interface VideoUpload {
+  upload_id: string;
+  camera_id: string;
+  filename: string;
+  status: 'uploaded' | 'processing' | 'completed' | 'failed';
+  upload_time: string;
+  file_size: number;
+  description?: string;
+  process_start_time?: string;
+  process_end_time?: string;
+  alerts_generated?: number;
+  processing_progress?: number;
+}
+
+export interface VideoUploadsList {
+  uploads: VideoUpload[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
 export const monitoringApi = {
   // Get all cameras with monitoring status
   async getCamerasMonitoringStatus(): Promise<CameraMonitoringStatus[]> {
@@ -117,5 +153,50 @@ export const monitoringApi = {
   // Get video stream URL for display
   getVideoStreamUrl(cameraId: string): string {
     return `${apiClient.defaults.baseURL}/api/v1/video/stream/${cameraId}`;
+  },
+
+  // Upload video file for testing
+  async uploadVideoFile(
+    file: File,
+    cameraId: string,
+    description?: string
+  ): Promise<VideoUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('camera_id', cameraId);
+    if (description) {
+      formData.append('description', description);
+    }
+
+    const response = await apiClient.post('/api/v1/video/upload-video', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Process uploaded video file
+  async processVideoFile(uploadId: string): Promise<VideoProcessingResponse> {
+    const response = await apiClient.post(`/api/v1/video/process-video/${uploadId}`);
+    return response.data;
+  },
+
+  // Get upload status
+  async getUploadStatus(uploadId: string): Promise<VideoUpload> {
+    const response = await apiClient.get(`/api/v1/video/upload-status/${uploadId}`);
+    return response.data;
+  },
+
+  // List user uploads
+  async listUserUploads(skip: number = 0, limit: number = 50): Promise<VideoUploadsList> {
+    const response = await apiClient.get(`/api/v1/video/uploads?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // Delete upload
+  async deleteUpload(uploadId: string): Promise<{ upload_id: string; message: string }> {
+    const response = await apiClient.delete(`/api/v1/video/upload/${uploadId}`);
+    return response.data;
   }
 };

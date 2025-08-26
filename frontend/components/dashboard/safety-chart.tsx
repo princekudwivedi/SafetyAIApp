@@ -42,7 +42,10 @@ export function SafetyChart({ dashboardData, alertsSummary, isLoading }: SafetyC
 
   // Process chart data from props using useMemo to prevent unnecessary recalculations
   const chartData = useMemo((): ChartData => {
+    console.log('🔄 Processing chart data:', { dashboardData, alertsSummary }); // Debug log
+    
     if (!dashboardData || !alertsSummary) {
+      console.log('❌ Missing data:', { hasDashboardData: !!dashboardData, hasAlertsSummary: !!alertsSummary });
       return {
         weeklyData: [],
         violationTypes: []
@@ -57,15 +60,21 @@ export function SafetyChart({ dashboardData, alertsSummary, isLoading }: SafetyC
         alerts: Number(item.alerts) || 0
       }));
       
-      // Transform violation types
-      const violationTypes = alertsSummary.alerts_by_severity.map(item => ({
-        type: item.severity,
+      console.log('📊 Weekly data transformed:', weeklyData); // Debug log
+      
+      // Transform violation types - use alerts_by_status instead of alerts_by_severity for better data
+      const violationTypes = alertsSummary.alerts_by_status.map(item => ({
+        type: item.status,
         count: Number(item.count) || 0,
         percentage: dashboardData.total_alerts > 0 ? (Number(item.count) / dashboardData.total_alerts) * 100 : 0
       }));
       
+      console.log('🚨 Violation types transformed:', violationTypes); // Debug log
+      
       const validatedWeeklyData = validateData(weeklyData);
       const validatedViolationTypes = validateData(violationTypes);
+      
+      console.log('✅ Validated data:', { weeklyData: validatedWeeklyData, violationTypes: validatedViolationTypes }); // Debug log
       
       return {
         weeklyData: validatedWeeklyData,
@@ -107,7 +116,13 @@ export function SafetyChart({ dashboardData, alertsSummary, isLoading }: SafetyC
     return (
       <div className="space-y-6">
         <div className="text-center py-8">
-          <p className="text-gray-500">No chart data available</p>
+          <p className="text-gray-500">Chart data is loading...</p>
+          <div className="mt-4 text-sm text-gray-400">
+            <p>Weekly data: {chartData.weeklyData.length} days</p>
+            <p>Violation types: {chartData.violationTypes.length} categories</p>
+            <p>Dashboard data: {dashboardData ? 'Loaded' : 'Not loaded'}</p>
+            <p>Alerts summary: {alertsSummary ? 'Loaded' : 'Not loaded'}</p>
+          </div>
         </div>
       </div>
     );
@@ -174,9 +189,9 @@ export function SafetyChart({ dashboardData, alertsSummary, isLoading }: SafetyC
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center p-3 bg-gray-50 rounded-lg">
           <p className="text-2xl font-bold text-red-600">
-            {chartData.weeklyData.reduce((sum, item) => sum + item.violations, 0)}
+            {alertsSummary?.weekly_violations || chartData.weeklyData.reduce((sum, item) => sum + item.violations, 0)}
           </p>
-          <p className="text-sm text-gray-600">Total Violations</p>
+          <p className="text-sm text-gray-600">Weekly Violations</p>
         </div>
         <div className="text-center p-3 bg-gray-50 rounded-lg">
           <p className="text-2xl font-bold text-yellow-600">

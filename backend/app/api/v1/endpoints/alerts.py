@@ -10,10 +10,36 @@ import json
 
 router = APIRouter()
 
+def format_enum_value(value: str) -> str:
+    """Convert enum values to consistent key format (e.g., 'In Progress' -> 'in_progress')"""
+    if not value:
+        return value
+    return value.lower().replace(' ', '_')
+
+def reverse_format_enum_value(value: str) -> str:
+    """Convert formatted enum values back to original format (e.g., 'in_progress' -> 'In Progress')"""
+    if not value:
+        return value
+    
+    # Special mapping for status values that don't follow the simple pattern
+    status_mapping = {
+        'new': 'New',
+        'in_progress': 'In Progress',
+        'resolved': 'Resolved',
+        'dismissed': 'Dismissed'
+    }
+    
+    # Check if it's a special status value first
+    if value in status_mapping:
+        return status_mapping[value]
+    
+    # For other values, use the simple pattern
+    return value.replace('_', ' ').title()
+
 @router.get("/", response_model=List[Dict[str, Any]])
 async def get_alerts(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(1000, ge=1, le=10000),  # Increased default limit to get more records
     status: Optional[AlertStatus] = None,
     severity: Optional[SeverityLevel] = None,
     camera_id: Optional[str] = None,
@@ -44,21 +70,109 @@ async def get_alerts(
                 timestamp_filter["$lte"] = end_date
             filter_query["timestamp"] = timestamp_filter
         
-        # Get alerts from database
+        # Get alerts from database with proper sorting
         cursor = db.alerts.find(filter_query).sort("timestamp", -1).skip(skip).limit(limit)
         alerts = await cursor.to_list(length=limit)
         
-        # Convert ObjectId to string for JSON serialization
+        # Convert ObjectId to string and format enum values for JSON serialization
         for alert in alerts:
             if "_id" in alert:
                 alert["_id"] = str(alert["_id"])
             if "timestamp" in alert:
                 alert["timestamp"] = alert["timestamp"].isoformat()
+            if "status" in alert:
+                alert["status"] = format_enum_value(alert["status"])
+            if "severity_level" in alert:
+                alert["severity_level"] = format_enum_value(alert["severity_level"])
+            if "violation_type" in alert:
+                alert["violation_type"] = format_enum_value(alert["violation_type"])
         
         return alerts
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching alerts: {str(e)}")
+
+@router.get("/unique/status", response_model=List[str])
+async def get_unique_status_values(
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all unique status values from the database"""
+    try:
+        pipeline = [
+            {"$group": {"_id": "$status"}},
+            {"$sort": {"_id": 1}}
+        ]
+        
+        status_values = await db.alerts.aggregate(pipeline).to_list(length=10)
+        
+        # Convert to formatted values and return
+        unique_statuses = [format_enum_value(item["_id"]) for item in status_values]
+        return unique_statuses
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching unique status values: {str(e)}")
+
+@router.get("/unique/severity", response_model=List[str])
+async def get_unique_severity_values(
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all unique severity values from the database"""
+    try:
+        pipeline = [
+            {"$group": {"_id": "$severity_level"}},
+            {"$sort": {"_id": 1}}
+        ]
+        
+        severity_values = await db.alerts.aggregate(pipeline).to_list(length=10)
+        
+        # Convert to formatted values and return
+        unique_severities = [format_enum_value(item["_id"]) for item in severity_values]
+        return unique_severities
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching unique severity values: {str(e)}")
+
+@router.get("/count", response_model=Dict[str, int])
+async def get_alerts_count(
+    status: Optional[AlertStatus] = None,
+    severity: Optional[SeverityLevel] = None,
+    camera_id: Optional[str] = None,
+    site_id: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get total count of alerts with optional filtering"""
+    try:
+        # Build filter query (same as get_alerts)
+        filter_query = {}
+        
+        if status:
+            filter_query["status"] = status
+        if severity:
+            filter_query["severity_level"] = severity
+        if camera_id:
+            filter_query["camera_id"] = camera_id
+        if site_id:
+            filter_query["location_id"] = site_id
+        if start_date or end_date:
+            timestamp_filter = {}
+            if start_date:
+                timestamp_filter["$gte"] = start_date
+            if end_date:
+                timestamp_filter["$lte"] = end_date
+            filter_query["timestamp"] = timestamp_filter
+        
+        # Get count
+        count = await db.alerts.count_documents(filter_query)
+        
+        return {"total_count": count}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error counting alerts: {str(e)}")
 
 @router.get("/{alert_id}", response_model=Dict[str, Any])
 async def get_alert(
@@ -73,11 +187,17 @@ async def get_alert(
         if not alert:
             raise HTTPException(status_code=404, detail="Alert not found")
         
-        # Convert ObjectId to string for JSON serialization
+        # Convert ObjectId to string and format enum values for JSON serialization
         if "_id" in alert:
             alert["_id"] = str(alert["_id"])
         if "timestamp" in alert:
             alert["timestamp"] = alert["timestamp"].isoformat()
+        if "status" in alert:
+            alert["status"] = format_enum_value(alert["status"])
+        if "severity_level" in alert:
+            alert["severity_level"] = format_enum_value(alert["severity_level"])
+        if "violation_type" in alert:
+            alert["violation_type"] = format_enum_value(alert["violation_type"])
         
         return alert
         
@@ -117,9 +237,12 @@ async def create_alert(
         # Insert into database
         result = await db.alerts.insert_one(alert_doc)
         
-        # Return created alert
+        # Return created alert with formatted enum values
         alert_doc["_id"] = str(result.inserted_id)
         alert_doc["timestamp"] = alert_doc["timestamp"].isoformat()
+        alert_doc["status"] = format_enum_value(alert_doc["status"])
+        alert_doc["severity_level"] = format_enum_value(alert_doc["severity_level"])
+        alert_doc["violation_type"] = format_enum_value(alert_doc["violation_type"])
         
         return alert_doc
         
@@ -135,11 +258,19 @@ async def update_alert(
 ):
     """Update an existing alert"""
     try:
+        print(f"🔍 Received update request for alert {alert_id}")
+        print(f"🔍 Alert update data: {alert_update}")
+        print(f"🔍 Alert update type: {type(alert_update)}")
+        print(f"🔍 Status value: '{alert_update.status}' (type: {type(alert_update.status)})")
         # Build update fields
         update_fields = {}
         
         if alert_update.status is not None:
-            update_fields["status"] = alert_update.status
+            # Convert formatted status back to original enum format
+            print(f"🔍 Received status update: '{alert_update.status}' (type: {type(alert_update.status)})")
+            original_status = reverse_format_enum_value(alert_update.status)
+            print(f"Status conversion: '{alert_update.status}' -> '{original_status}'")
+            update_fields["status"] = original_status
         if alert_update.assigned_to is not None:
             update_fields["assigned_to"] = alert_update.assigned_to
         if alert_update.resolution_notes is not None:
@@ -148,21 +279,32 @@ async def update_alert(
         update_fields["updated_at"] = datetime.now(timezone.utc)
         
         # Update alert in database
+        print(f"🔍 Update fields: {update_fields}")
+        print(f"🔍 Query filter: {{'alert_id': '{alert_id}'}}")
+        
         result = await db.alerts.update_one(
             {"alert_id": alert_id},
             {"$set": update_fields}
         )
         
+        print(f"🔍 Update result: matched={result.matched_count}, modified={result.modified_count}")
+        
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Alert not found")
         
-        # Return updated alert
+        # Return updated alert with formatted enum values
         updated_alert = await db.alerts.find_one({"alert_id": alert_id})
         
         if "_id" in updated_alert:
             updated_alert["_id"] = str(updated_alert["_id"])
         if "timestamp" in updated_alert:
             updated_alert["timestamp"] = updated_alert["timestamp"].isoformat()
+        if "status" in updated_alert:
+            updated_alert["status"] = format_enum_value(updated_alert["status"])
+        if "severity_level" in updated_alert:
+            updated_alert["severity_level"] = format_enum_value(updated_alert["severity_level"])
+        if "violation_type" in updated_alert:
+            updated_alert["violation_type"] = format_enum_value(updated_alert["violation_type"])
         
         return updated_alert
         
@@ -204,17 +346,23 @@ async def get_recent_active_alerts(
         
         cursor = db.alerts.find({
             "timestamp": {"$gte": yesterday},
-            "status": {"$in": ["New", "In Progress"]}
+            "status": {"$in": [AlertStatus.NEW, AlertStatus.IN_PROGRESS]}
         }).sort("timestamp", -1).limit(limit)
         
         alerts = await cursor.to_list(length=limit)
         
-        # Convert ObjectId to string for JSON serialization
+        # Convert ObjectId to string and format enum values for JSON serialization
         for alert in alerts:
             if "_id" in alert:
                 alert["_id"] = str(alert["_id"])
             if "timestamp" in alert:
                 alert["timestamp"] = alert["timestamp"].isoformat()
+            if "status" in alert:
+                alert["status"] = format_enum_value(alert["status"])
+            if "severity_level" in alert:
+                alert["severity_level"] = format_enum_value(alert["severity_level"])
+            if "violation_type" in alert:
+                alert["violation_type"] = format_enum_value(alert["violation_type"])
         
         return alerts
         
@@ -236,8 +384,8 @@ async def get_alerts_status_summary(
         
         status_summary = await db.alerts.aggregate(pipeline).to_list(length=10)
         
-        # Convert to dictionary format
-        status_dict = {item["_id"]: item["count"] for item in status_summary}
+        # Convert to dictionary format with formatted keys
+        status_dict = {format_enum_value(item["_id"]): item["count"] for item in status_summary}
         
         return {
             "total_alerts": sum(status_dict.values()),
@@ -262,8 +410,8 @@ async def get_alerts_severity_summary(
         
         severity_summary = await db.alerts.aggregate(pipeline).to_list(length=10)
         
-        # Convert to dictionary format
-        severity_dict = {item["_id"]: item["count"] for item in severity_summary}
+        # Convert to dictionary format with formatted keys
+        severity_dict = {format_enum_value(item["_id"]): item["count"] for item in severity_summary}
         
         return {
             "total_alerts": sum(severity_dict.values()),

@@ -1,14 +1,12 @@
 'use client';
 
-'use client';
-
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
-export default function SettingsPageRoute() {
+export default function SystemSettingsPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 

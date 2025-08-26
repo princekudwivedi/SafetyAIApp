@@ -8,7 +8,7 @@ import { RecentAlerts } from './recent-alerts';
 import { SystemStatus } from './system-status';
 import { TrendingUp, TrendingDown, AlertTriangle, Video, Users, Shield } from 'lucide-react';
 import { dashboardApi, DashboardStats as ApiDashboardStats, AlertsSummary } from '@/lib/api/dashboard';
-import { TestErrorHandler } from '../test-error-handler';
+
 
 interface DashboardStats {
   totalViolations: number;
@@ -61,6 +61,8 @@ export function DashboardOverview() {
       ]);
       
       console.log('✅ Dashboard data loaded successfully'); // Debug log
+      console.log('📊 Dashboard Stats:', apiStats); // Debug log
+      console.log('🚨 Alerts Summary:', apiAlertsSummary); // Debug log
       
       // Store raw data for child components
       setDashboardData(apiStats);
@@ -198,10 +200,7 @@ export function DashboardOverview() {
         </div>
       </div>
 
-      {/* Error Handler Test Component - Remove after debugging */}
-      <div className="mb-6">
-        <TestErrorHandler />
-      </div>
+
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

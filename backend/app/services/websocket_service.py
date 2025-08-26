@@ -67,27 +67,46 @@ class WebSocketService:
         """Disconnect a client."""
         self.manager.disconnect(websocket, connection_type)
     
-    async def broadcast_alert(self, alert: Alert):
+    async def broadcast_alert(self, alert):
         """Broadcast a new alert to all connected clients."""
         try:
-            message = {
-                "type": "alert",
-                "data": {
-                    "alert_id": alert.alert_id,
-                    "timestamp": alert.timestamp.isoformat(),
-                    "violation_type": alert.violation_type.value,
-                    "severity_level": alert.severity_level.value,
-                    "description": alert.description,
-                    "location_id": alert.location_id,
-                    "camera_id": alert.camera_id,
-                    "status": alert.status.value
+            # Handle both Alert objects and dictionaries
+            if hasattr(alert, 'alert_id'):
+                # Alert object
+                message = {
+                    "type": "alert",
+                    "data": {
+                        "alert_id": alert.alert_id,
+                        "timestamp": alert.timestamp.isoformat() if hasattr(alert.timestamp, 'isoformat') else str(alert.timestamp),
+                        "violation_type": alert.violation_type.value if hasattr(alert.violation_type, 'value') else alert.violation_type,
+                        "severity_level": alert.severity_level.value if hasattr(alert.severity_level, 'value') else alert.severity_level,
+                        "description": alert.description,
+                        "location_id": alert.location_id,
+                        "camera_id": alert.camera_id,
+                        "status": alert.status.value if hasattr(alert.status, 'value') else alert.status
+                    }
                 }
-            }
+            else:
+                # Dictionary
+                message = {
+                    "type": "alert",
+                    "data": {
+                        "alert_id": alert.get("alert_id", "unknown"),
+                        "timestamp": str(alert.get("timestamp", datetime.utcnow())),
+                        "violation_type": alert.get("violation_type", "unknown"),
+                        "severity_level": alert.get("severity_level", "unknown"),
+                        "description": alert.get("description", "No description"),
+                        "location_id": alert.get("location_id", "unknown"),
+                        "camera_id": alert.get("camera_id", "unknown"),
+                        "status": alert.get("status", "new")
+                    }
+                }
             
             await self.manager.broadcast_to_type(json.dumps(message), "alerts")
             await self.manager.broadcast_to_type(json.dumps(message), "dashboard")
             
-            logger.info(f"Broadcasted alert {alert.alert_id} to connected clients")
+            alert_id = message["data"]["alert_id"]
+            logger.info(f"Broadcasted alert {alert_id} to connected clients")
             
         except Exception as e:
             logger.error(f"Error broadcasting alert: {e}")

@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, UploadFile, File, Query
-from fastapi.responses import StreamingResponse
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, UploadFile, File, Query, Form
+from fastapi.responses import StreamingResponse, JSONResponse
+from typing import List, Optional, Dict, Any
 import cv2
 import numpy as np
 import io
 import asyncio
 import logging
+import os
+import tempfile
+import uuid
+from pathlib import Path
 from app.models.user import User
 from app.models.safety import Camera, CameraCreate, CameraUpdate
 from app.services.video_service import VideoService
@@ -20,6 +24,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 video_service = VideoService()
 websocket_service = WebSocketService()
+
+# Store uploaded video files temporarily
+uploaded_videos: Dict[str, Dict[str, Any]] = {}
 
 @router.get("/stream/{camera_id}")
 async def get_video_stream(
@@ -682,4 +689,284 @@ async def download_recording(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error downloading recording: {str(e)}"
+        )
+
+@router.post("/upload-video")
+async def upload_video_file(
+    file: UploadFile = File(...),
+    camera_id: str = Form(...),
+    description: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Upload a video file for testing alert generation."""
+    try:
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith('video/'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must be a video file"
+            )
+        
+        # Validate file size (max 100MB)
+        if file.size and file.size > 100 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File size must be less than 100MB"
+            )
+        
+        # Get camera info
+        database = get_database()
+        camera_doc = await database.cameras.find_one({"camera_id": camera_id})
+        if not camera_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Camera not found"
+            )
+        
+        # Create unique ID for this upload
+        upload_id = str(uuid.uuid4())
+        
+        # Save file to temporary directory
+        temp_dir = Path(tempfile.gettempdir()) / "safety_ai_uploads"
+        temp_dir.mkdir(exist_ok=True)
+        
+        file_extension = Path(file.filename).suffix if file.filename else '.mp4'
+        temp_file_path = temp_dir / f"{upload_id}{file_extension}"
+        
+        with open(temp_file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Store upload info
+        uploaded_videos[upload_id] = {
+            "camera_id": camera_id,
+            "file_path": str(temp_file_path),
+            "filename": file.filename or f"upload_{upload_id}{file_extension}",
+            "description": description,
+            "upload_time": datetime.utcnow(),
+            "file_size": len(content),
+            "status": "uploaded",
+            "user_id": current_user.id
+        }
+        
+        logger.info(f"Video file uploaded: {upload_id} for camera {camera_id}")
+        
+        return {
+            "upload_id": upload_id,
+            "camera_id": camera_id,
+            "filename": file.filename,
+            "file_size": len(content),
+            "status": "uploaded",
+            "message": "Video file uploaded successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading video file: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading video file: {str(e)}"
+        )
+
+@router.post("/process-video/{upload_id}")
+async def process_video_file(
+    upload_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Process an uploaded video file to test alert generation."""
+    try:
+        if upload_id not in uploaded_videos:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Upload not found"
+            )
+        
+        upload_info = uploaded_videos[upload_id]
+        
+        # Check if user owns this upload
+        if upload_info["user_id"] != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this upload"
+            )
+        
+        # Update status
+        upload_info["status"] = "processing"
+        upload_info["process_start_time"] = datetime.utcnow()
+        
+        # Start video processing in background
+        asyncio.create_task(
+            video_service.process_video_file(
+                upload_id=upload_id,
+                file_path=upload_info["file_path"],
+                camera_id=upload_info["camera_id"],
+                user_id=current_user.id
+            )
+        )
+        
+        logger.info(f"Started processing video file: {upload_id}")
+        
+        return {
+            "upload_id": upload_id,
+            "status": "processing",
+            "message": "Video processing started"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting video processing: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error starting video processing: {str(e)}"
+        )
+
+@router.get("/upload-status/{upload_id}")
+async def get_upload_status(
+    upload_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get the status of a video upload and processing."""
+    try:
+        if upload_id not in uploaded_videos:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Upload not found"
+            )
+        
+        upload_info = uploaded_videos[upload_id]
+        
+        # Check if user owns this upload
+        if upload_info["user_id"] != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this upload"
+            )
+        
+        return {
+            "upload_id": upload_id,
+            "camera_id": upload_info["camera_id"],
+            "filename": upload_info["filename"],
+            "status": upload_info["status"],
+            "upload_time": upload_info["upload_time"],
+            "file_size": upload_info["file_size"],
+            "description": upload_info["description"],
+            "process_start_time": upload_info.get("process_start_time"),
+            "process_end_time": upload_info.get("process_end_time"),
+            "alerts_generated": upload_info.get("alerts_generated", 0),
+            "processing_progress": upload_info.get("processing_progress", 0)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting upload status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting upload status: {str(e)}"
+        )
+
+@router.get("/uploads")
+async def list_user_uploads(
+    current_user: User = Depends(get_current_active_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100)
+):
+    """List all video uploads for the current user."""
+    try:
+        user_uploads = [
+            upload for upload in uploaded_videos.values()
+            if upload["user_id"] == current_user.id
+        ]
+        
+        # Sort by upload time (newest first)
+        user_uploads.sort(key=lambda x: x["upload_time"], reverse=True)
+        
+        # Apply pagination
+        total = len(user_uploads)
+        paginated_uploads = user_uploads[skip:skip + limit]
+        
+        # Create a list of uploads with their IDs
+        uploads_with_ids = []
+        for upload in paginated_uploads:
+            # Find the upload_id for this upload
+            upload_id = None
+            for uid, upload_data in uploaded_videos.items():
+                if upload_data == upload:
+                    upload_id = uid
+                    break
+            
+            if upload_id:
+                uploads_with_ids.append({
+                    "upload_id": upload_id,
+                    "camera_id": upload["camera_id"],
+                    "filename": upload["filename"],
+                    "status": upload["status"],
+                    "upload_time": upload["upload_time"],
+                    "file_size": upload["file_size"],
+                    "description": upload["description"],
+                    "alerts_generated": upload.get("alerts_generated", 0)
+                })
+        
+        return {
+            "uploads": uploads_with_ids,
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing user uploads: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error listing uploads: {str(e)}"
+        )
+
+@router.delete("/upload/{upload_id}")
+async def delete_upload(
+    upload_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a video upload."""
+    try:
+        if upload_id not in uploaded_videos:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Upload not found"
+            )
+        
+        upload_info = uploaded_videos[upload_id]
+        
+        # Check if user owns this upload
+        if upload_info["user_id"] != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this upload"
+            )
+        
+        # Delete file
+        try:
+            if os.path.exists(upload_info["file_path"]):
+                os.remove(upload_info["file_path"])
+        except Exception as e:
+            logger.warning(f"Failed to delete file {upload_info['file_path']}: {e}")
+        
+        # Remove from memory
+        del uploaded_videos[upload_id]
+        
+        logger.info(f"Deleted video upload: {upload_id}")
+        
+        return {
+            "upload_id": upload_id,
+            "message": "Upload deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting upload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting upload: {str(e)}"
         )

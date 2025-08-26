@@ -136,6 +136,7 @@ class CentralizedErrorHandler {
         break;
       
       case 400:
+      case 422:
         this.handleValidationError(apiError);
         break;
       
@@ -230,16 +231,27 @@ class CentralizedErrorHandler {
   }
 
   /**
-   * Handle validation errors (4xx)
+   * Handle validation errors (4xx and 422)
    */
   private handleValidationError(apiError: ApiError): void {
-    console.warn('⚠️ Validation error:', apiError.message);
+    if (apiError.status === 422) {
+      console.warn('⚠️ 422 Unprocessable Content - Validation Error:', apiError.message);
+      console.log('🔍 422 Error Details:', {
+        status: apiError.status,
+        message: apiError.message,
+        errorCode: apiError.errorCode,
+        details: apiError.details
+      });
+    } else {
+      console.warn('⚠️ Validation error:', apiError.message);
+    }
     
     if (this.config.onValidationError) {
       this.config.onValidationError(apiError);
     } else {
       // Default behavior: show error message
-      this.showErrorNotification('Validation Error', apiError.message);
+      const title = apiError.status === 422 ? 'Data Validation Error' : 'Validation Error';
+      this.showErrorNotification(title, apiError.message);
     }
   }
 

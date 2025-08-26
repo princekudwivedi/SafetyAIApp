@@ -1,14 +1,13 @@
 'use client';
 
-'use client';
-
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { UserProfile } from '@/components/dashboard/user-profile';
 
-export default function SettingsPageRoute() {
+export default function ProfilePage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 

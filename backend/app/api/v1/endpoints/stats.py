@@ -12,8 +12,11 @@ import random
 router = APIRouter()
 
 @router.get("/dashboard")
-async def get_dashboard_stats(db: AsyncIOMotorDatabase = Depends(get_database)):
-    """Get dashboard statistics"""
+async def get_dashboard_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Get dashboard statistics - requires authentication"""
     try:
         # Get current date and time
         now = datetime.now(timezone.utc)
@@ -172,9 +175,10 @@ async def get_dashboard_stats(db: AsyncIOMotorDatabase = Depends(get_database)):
 @router.get("/alerts/summary")
 async def get_alerts_summary(
     days: int = 30,
+    current_user: User = Depends(get_current_active_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Get alerts summary for specified number of days"""
+    """Get alerts summary for specified number of days - requires authentication"""
     try:
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days)
@@ -250,9 +254,10 @@ async def get_alerts_summary(
 @router.get("/alerts/trends")
 async def get_alerts_trends(
     days: int = 30,
+    current_user: User = Depends(get_current_active_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Get alerts trends over time."""
+    """Get alerts trends over time - requires authentication."""
     try:
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days)
@@ -308,8 +313,11 @@ async def get_alerts_trends(
         )
 
 @router.get("/cameras/performance")
-async def get_cameras_performance(db: AsyncIOMotorDatabase = Depends(get_database)):
-    """Get cameras performance statistics"""
+async def get_cameras_performance(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Get cameras performance statistics - requires authentication"""
     try:
         # Get all active cameras
         cameras = await db.cameras.find({"status": "Active"}).to_list(length=100)
@@ -348,8 +356,11 @@ async def get_cameras_performance(db: AsyncIOMotorDatabase = Depends(get_databas
         raise HTTPException(status_code=500, detail=f"Error fetching camera performance: {str(e)}")
 
 @router.get("/sites/overview")
-async def get_sites_overview(db: AsyncIOMotorDatabase = Depends(get_database)):
-    """Get sites overview with statistics"""
+async def get_sites_overview(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Get sites overview with statistics - requires authentication"""
     try:
         sites = await db.sites.find({"is_active": True}).to_list(length=100)
         
@@ -390,9 +401,10 @@ async def get_sites_overview(db: AsyncIOMotorDatabase = Depends(get_database)):
 @router.get("/violations/analysis")
 async def get_violations_analysis(
     days: int = 30,
+    current_user: User = Depends(get_current_active_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Get detailed violations analysis."""
+    """Get detailed violations analysis - requires authentication."""
     try:
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days)

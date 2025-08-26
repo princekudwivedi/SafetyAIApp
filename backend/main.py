@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.api.v1.api import api_router
 from app.core.logging import setup_logging
+from app.core.auth_middleware import add_global_auth_middleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,6 +33,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global authentication middleware - must be added before including routers
+add_global_auth_middleware(app)
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")

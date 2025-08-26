@@ -70,8 +70,11 @@ async def get_video_stream(
         )
 
 @router.get("/test/{camera_id}")
-async def test_camera_stream(camera_id: str):
-    """Test camera stream without authentication (for debugging)."""
+async def test_camera_stream(
+    camera_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Test camera stream - requires authentication."""
     try:
         # Get camera info
         database = get_database()

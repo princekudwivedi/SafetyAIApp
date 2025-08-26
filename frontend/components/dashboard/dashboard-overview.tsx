@@ -8,6 +8,7 @@ import { RecentAlerts } from './recent-alerts';
 import { SystemStatus } from './system-status';
 import { TrendingUp, TrendingDown, AlertTriangle, Video, Users, Shield } from 'lucide-react';
 import { dashboardApi, DashboardStats as ApiDashboardStats, AlertsSummary } from '@/lib/api/dashboard';
+import { TestErrorHandler } from '../test-error-handler';
 
 interface DashboardStats {
   totalViolations: number;
@@ -195,6 +196,11 @@ export function DashboardOverview() {
           }`} />
           {isConnected ? 'Connected' : 'Disconnected'}
         </div>
+      </div>
+
+      {/* Error Handler Test Component - Remove after debugging */}
+      <div className="mb-6">
+        <TestErrorHandler />
       </div>
 
       {/* Key Metrics */}

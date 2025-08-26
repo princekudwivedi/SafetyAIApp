@@ -25,3 +25,7 @@ def setup_logging():
     # Set specific logger levels
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("fastapi").setLevel(logging.INFO)
+
+def get_logger(name: str) -> logging.Logger:
+    """Get a logger instance with the specified name."""
+    return logging.getLogger(name)

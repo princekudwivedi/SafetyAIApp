@@ -1,4 +1,12 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import { createErrorHandler, defaultErrorHandlerConfig, CentralizedErrorHandler } from './error-handler';
+
+// Create centralized error handler with default configuration
+// This will be updated when the auth context is available
+let errorHandler = createErrorHandler(defaultErrorHandlerConfig);
+
+// Flag to track if error handler has been updated
+let isErrorHandlerUpdated = false;
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -33,7 +41,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle auth errors
+// Response interceptor to handle all errors centrally
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     console.log('✅ API Response:', {
@@ -45,48 +53,60 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
-    console.error('❌ API Response Error:', {
+    console.log('🔍 Error interceptor triggered:', {
       status: error.response?.status,
-      statusText: error.response?.statusText,
-      url: error.config?.url,
-      method: error.config?.method?.toUpperCase(),
       message: error.message,
-      responseData: error.response?.data
+      url: error.config?.url,
+      isErrorHandlerUpdated,
+      errorHandlerType: errorHandler.constructor.name
     });
+
+    // Use centralized error handler for all errors
+    const apiError = errorHandler.handleError(error);
     
-    const originalRequest = error.config;
+    // Log the error for debugging
+    console.error('❌ API Response Error:', {
+      status: apiError.status,
+      message: apiError.message,
+      errorCode: apiError.errorCode,
+      url: error.config?.url,
+      method: error.config?.method?.toUpperCase()
+    });
 
-    // If 401 and we haven't tried to refresh yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        // Try to refresh token
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/auth/refresh`,
-            { refresh_token: refreshToken }
-          );
-
-          const { access_token } = response.data;
-          localStorage.setItem('auth_token', access_token);
-
-          // Retry original request
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-          return apiClient(originalRequest);
-        }
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/';
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
+    // For 401 errors, the error handler will automatically:
+    // 1. Clear authentication data
+    // 2. Trigger logout callback
+    // 3. Redirect to login page
+    
+    // For other errors, they will be handled according to their type
+    // and can be customized via the error handler configuration
+    
+    // Always reject the promise so components can handle errors if needed
+    return Promise.reject(apiError);
   }
 );
 
-export { apiClient };
+/**
+ * Update the error handler with auth context integration
+ * This should be called after the auth context is initialized
+ */
+export function updateErrorHandler(newErrorHandler: CentralizedErrorHandler) {
+  errorHandler = newErrorHandler;
+  isErrorHandlerUpdated = true;
+  console.log('🔄 Error handler updated with auth context integration:', {
+    newHandlerType: newErrorHandler.constructor.name,
+    isUpdated: isErrorHandlerUpdated
+  });
+}
+
+/**
+ * Check if the error handler has been updated with auth context
+ */
+export function isErrorHandlerReady(): boolean {
+  return isErrorHandlerUpdated;
+}
+
+export { apiClient, errorHandler };
+
+// Export types for use in components
+export type { CentralizedErrorHandler } from './error-handler';

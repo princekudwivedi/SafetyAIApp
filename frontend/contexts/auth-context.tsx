@@ -1,10 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, LoginCredentials } from '@/types/auth';
-import { authApi } from '@/lib/api/auth';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User, LoginCredentials } from '../types/auth';
+import { authApi } from '../lib/api/auth';
+import { createAuthErrorHandler } from '../lib/api/auth-error-handler';
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -98,14 +99,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Set user
           setUser(userData);
         } catch (userError) {
-          console.error('❌ Failed to get user details:', userError);
-          // If we can't get user details, create a basic user object from credentials
+          console.error('Failed to fetch user details:', userError);
+          // Create a basic user object from credentials
           const userData: User = {
-            id: `user-${Date.now()}`,
+            id: 'temp-user-id',
             username: credentials.username,
-            email: `${credentials.username}@safetyai.com`,
-            role: 'Operator' as any, // Default role
-            site_id: 'site-001',
+            email: `${credentials.username}@example.com`,
+            role: credentials.role as any,
             is_active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -133,9 +133,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    console.log('🚪 Logging out user');
+    
+    // Clear all authentication data
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('auth_session');
+    
+    // Update state
     setUser(null);
+    
+    // Redirect to login page
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   const refreshUser = async () => {

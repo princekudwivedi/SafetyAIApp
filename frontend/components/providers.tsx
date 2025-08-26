@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from 'react-query/devtools';
 import { AuthProvider } from '@/contexts/auth-context';
 import { ThemeProvider } from '@/contexts/theme-context';
 import { WebSocketProvider } from '@/contexts/websocket-context';
+import { ErrorHandlerProvider } from '@/providers/error-handler-provider';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,10 +22,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <WebSocketProvider>
-            {children}
-            <ReactQueryDevtools initialIsOpen={false} />
-          </WebSocketProvider>
+          <ErrorHandlerProvider>
+            <WebSocketProvider>
+              {children}
+              <ReactQueryDevtools initialIsOpen={false} />
+            </WebSocketProvider>
+          </ErrorHandlerProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -11,7 +11,7 @@ let isErrorHandlerUpdated = false;
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-  timeout: 10000,
+  timeout: 60000, // Increased to 60 seconds for video processing
   headers: {
     'Content-Type': 'application/json',
   },

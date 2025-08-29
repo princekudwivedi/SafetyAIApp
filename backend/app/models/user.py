@@ -1,4 +1,4 @@
-from app.models.base import BaseDBModel, PyObjectId
+from app.models.base import BaseDBModel
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 from enum import Enum
@@ -28,7 +28,7 @@ class UserUpdate(BaseModel):
 
 class UserInDB(UserBase, BaseDBModel):
     password_hash: str
-    site_id: Optional[PyObjectId] = None
+    site_id: Optional[str] = None
 
 class User(UserBase, BaseDBModel):
     pass
@@ -39,6 +39,7 @@ class UserLogin(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
 
 class TokenData(BaseModel):

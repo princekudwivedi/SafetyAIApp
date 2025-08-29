@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 from datetime import datetime
+from bson import ObjectId
 from app.models.user import User, UserCreate, UserUpdate, UserRole
 from app.api.v1.endpoints.auth import get_current_active_user, get_password_hash
 from app.core.database import get_database
-from app.models.base import PyObjectId
+
 
 router = APIRouter()
 
@@ -67,7 +68,7 @@ async def get_user(
             )
         
         database = get_database()
-        user_doc = await database.users.find_one({"_id": PyObjectId(user_id)})
+        user_doc = await database.users.find_one({"_id": ObjectId(user_id)})
         
         if not user_doc:
             raise HTTPException(
@@ -177,7 +178,7 @@ async def update_user(
         database = get_database()
         
         # Check if user exists
-        existing_user = await database.users.find_one({"_id": PyObjectId(user_id)})
+        existing_user = await database.users.find_one({"_id": ObjectId(user_id)})
         if not existing_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -221,13 +222,13 @@ async def update_user(
         
         # Update user
         result = await database.users.update_one(
-            {"_id": PyObjectId(user_id)},
+            {"_id": ObjectId(user_id)},
             {"$set": update_fields}
         )
         
         if result.modified_count > 0:
             # Get updated user
-            updated_user = await database.users.find_one({"_id": PyObjectId(user_id)})
+            updated_user = await database.users.find_one({"_id": ObjectId(user_id)})
             return User(**updated_user)
         else:
             raise HTTPException(
@@ -267,7 +268,7 @@ async def delete_user(
         database = get_database()
         
         # Check if user exists
-        existing_user = await database.users.find_one({"_id": PyObjectId(user_id)})
+        existing_user = await database.users.find_one({"_id": ObjectId(user_id)})
         if not existing_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -275,7 +276,7 @@ async def delete_user(
             )
         
         # Delete user
-        result = await database.users.delete_one({"_id": PyObjectId(user_id)})
+        result = await database.users.delete_one({"_id": ObjectId(user_id)})
         
         if result.deleted_count > 0:
             return {"message": "User deleted successfully"}

@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 from datetime import datetime, timedelta
+from bson import ObjectId
 from app.models.user import User
 from app.models.safety import Camera, CameraCreate, CameraUpdate
 from app.api.v1.endpoints.auth import get_current_active_user
 from app.core.database import get_database
-from app.models.base import PyObjectId
+
 
 router = APIRouter()
 
-@router.get("/", response_model=List[Camera])
+@router.get("/", response_model=List[dict])
 async def get_cameras(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -17,7 +18,7 @@ async def get_cameras(
     status: Optional[str] = Query(None),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get cameras with filtering options."""
+    """Get cameras with filtering options and site information."""
     try:
         database = get_database()
         
@@ -33,7 +34,31 @@ async def get_cameras(
         cameras = []
         
         async for camera_doc in cursor:
-            cameras.append(Camera(**camera_doc))
+            # Get site information
+            site_doc = await database.sites.find_one({"site_id": camera_doc["site_id"]})
+            site_name = site_doc["site_name"] if site_doc else "Unknown Site"
+            
+            # Get camera alerts count
+            alerts_count = await database.alerts.count_documents({"camera_id": camera_doc["camera_id"]})
+            
+            # Create camera object with site information and alerts count
+            # Convert ObjectId to string to avoid serialization issues
+            camera_data = {
+                "_id": str(camera_doc.get("_id")) if camera_doc.get("_id") else "",
+                "camera_id": camera_doc.get("camera_id", ""),
+                "site_id": camera_doc.get("site_id", ""),
+                "camera_name": camera_doc.get("camera_name", ""),
+                "stream_url": camera_doc.get("stream_url", ""),
+                "status": camera_doc.get("status", "Active"),
+                "installation_date": camera_doc.get("installation_date", datetime.utcnow()),
+                "settings": camera_doc.get("settings", {}),
+                "location_description": camera_doc.get("location_description", ""),
+                "created_at": camera_doc.get("created_at", datetime.utcnow()),
+                "updated_at": camera_doc.get("updated_at", datetime.utcnow()),
+                "site_name": site_name,
+                "alerts_count": alerts_count
+            }
+            cameras.append(camera_data)
         
         return cameras
         
@@ -59,7 +84,21 @@ async def get_camera(
                 detail="Camera not found"
             )
         
-        return Camera(**camera_doc)
+        # Handle ObjectId conversion for _id field
+        camera_data = {
+            "_id": str(camera_doc.get("_id")) if camera_doc.get("_id") else str(ObjectId()),
+            "camera_id": camera_doc.get("camera_id", ""),
+            "site_id": camera_doc.get("site_id", ""),
+            "camera_name": camera_doc.get("camera_name", ""),
+            "stream_url": camera_doc.get("stream_url", ""),
+            "status": camera_doc.get("status", "Active"),
+            "installation_date": camera_doc.get("installation_date", datetime.utcnow()),
+            "settings": camera_doc.get("settings", {}),
+            "location_description": camera_doc.get("location_description", ""),
+            "created_at": camera_doc.get("created_at", datetime.utcnow()),
+            "updated_at": camera_doc.get("updated_at", datetime.utcnow())
+        }
+        return Camera(**camera_data)
         
     except HTTPException:
         raise
@@ -114,7 +153,7 @@ async def create_camera(
         result = await database.cameras.insert_one(camera_doc)
         
         if result.inserted_id:
-            camera_doc["_id"] = result.inserted_id
+            camera_doc["_id"] = str(result.inserted_id)
             return Camera(**camera_doc)
         else:
             raise HTTPException(
@@ -177,9 +216,23 @@ async def update_camera(
         )
         
         if result.modified_count > 0:
-            # Get updated camera
-            updated_camera = await database.cameras.find_one({"camera_id": camera_id})
-            return Camera(**updated_camera)
+             # Get updated camera
+             updated_camera = await database.cameras.find_one({"camera_id": camera_id})
+             # Handle ObjectId conversion for _id field
+             camera_data = {
+                 "_id": str(updated_camera.get("_id")) if updated_camera.get("_id") else str(ObjectId()),
+                 "camera_id": updated_camera.get("camera_id", ""),
+                 "site_id": updated_camera.get("site_id", ""),
+                 "camera_name": updated_camera.get("camera_name", ""),
+                 "stream_url": updated_camera.get("stream_url", ""),
+                 "status": updated_camera.get("status", "Active"),
+                 "installation_date": updated_camera.get("installation_date", datetime.utcnow()),
+                 "settings": updated_camera.get("settings", {}),
+                 "location_description": updated_camera.get("location_description", ""),
+                 "created_at": updated_camera.get("created_at", datetime.utcnow()),
+                 "updated_at": updated_camera.get("updated_at", datetime.utcnow())
+             }
+             return Camera(**camera_data)
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -197,6 +250,7 @@ async def update_camera(
 @router.delete("/{camera_id}")
 async def delete_camera(
     camera_id: str,
+    force: bool = Query(False, description="Force delete even with active alerts (Admin only)"),
     current_user: User = Depends(get_current_active_user)
 ):
     """Delete a camera."""
@@ -220,10 +274,17 @@ async def delete_camera(
         
         # Check if camera has active alerts
         alert_count = await database.alerts.count_documents({"camera_id": camera_id, "status": "New"})
-        if alert_count > 0:
+        if alert_count > 0 and not force:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete camera with active alerts"
+            )
+        
+        # If force delete is requested, only allow for administrators
+        if force and current_user.role.value != "Administrator":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can force delete cameras with active alerts"
             )
         
         # Delete camera

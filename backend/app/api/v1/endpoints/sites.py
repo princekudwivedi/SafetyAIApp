@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 from datetime import datetime
+from bson import ObjectId
 from app.models.user import User
 from app.models.safety import Site, SiteCreate, SiteUpdate
 from app.api.v1.endpoints.auth import get_current_active_user
 from app.core.database import get_database
-from app.models.base import PyObjectId
+
 
 router = APIRouter()
 
@@ -30,7 +31,20 @@ async def get_sites(
         sites = []
         
         async for site_doc in cursor:
-            sites.append(Site(**site_doc))
+            # Handle ObjectId conversion for _id field
+            site_data = {
+                "_id": str(site_doc.get("_id")) if site_doc.get("_id") else str(ObjectId()),
+                "site_id": site_doc.get("site_id", ""),
+                "site_name": site_doc.get("site_name", ""),
+                "location": site_doc.get("location", ""),
+                "contact_person": site_doc.get("contact_person", ""),
+                "contact_email": site_doc.get("contact_email"),
+                "contact_phone": site_doc.get("contact_phone"),
+                "is_active": site_doc.get("is_active", True),
+                "created_at": site_doc.get("created_at", datetime.utcnow()),
+                "updated_at": site_doc.get("updated_at", datetime.utcnow())
+            }
+            sites.append(Site(**site_data))
         
         return sites
         
@@ -56,7 +70,20 @@ async def get_site(
                 detail="Site not found"
             )
         
-        return Site(**site_doc)
+        # Handle ObjectId conversion for _id field
+        site_data = {
+            "_id": str(site_doc.get("_id")) if site_doc.get("_id") else str(ObjectId()),
+            "site_id": site_doc.get("site_id", ""),
+            "site_name": site_doc.get("site_name", ""),
+            "location": site_doc.get("location", ""),
+            "contact_person": site_doc.get("contact_person", ""),
+            "contact_email": site_doc.get("contact_email"),
+            "contact_phone": site_doc.get("contact_phone"),
+            "is_active": site_doc.get("is_active", True),
+            "created_at": site_doc.get("created_at", datetime.utcnow()),
+            "updated_at": site_doc.get("updated_at", datetime.utcnow())
+        }
+        return Site(**site_data)
         
     except HTTPException:
         raise
@@ -102,7 +129,7 @@ async def create_site(
         result = await database.sites.insert_one(site_doc)
         
         if result.inserted_id:
-            site_doc["_id"] = result.inserted_id
+            site_doc["_id"] = str(result.inserted_id)
             return Site(**site_doc)
         else:
             raise HTTPException(

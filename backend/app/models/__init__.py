@@ -1,5 +1,5 @@
 # Base models
-from .base import BaseDBModel, PyObjectId
+from .base import BaseDBModel
 
 # User models
 from .user import (
@@ -43,7 +43,7 @@ from .audit import (
 # Re-export commonly used enums
 __all__ = [
     # Base
-    "BaseDBModel", "PyObjectId",
+    "BaseDBModel",
     
     # User
     "User", "UserCreate", "UserUpdate", "UserInDB", "UserLogin", "Token", "TokenData", "UserRole",

@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/use-auth';
 import { LoginCredentials } from '@/types/auth';
-import { Eye, EyeOff, Lock, Shield, User } from 'lucide-react';
+import { Eye, EyeOff, Lock, Shield, User, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const loginSchema = z.object({
@@ -20,6 +20,7 @@ export function LoginForm() {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showDemoInfo, setShowDemoInfo] = useState(false);
 
   const {
     register,
@@ -34,7 +35,6 @@ export function LoginForm() {
     try {
       setIsLoading(true);
       await login(data);
-      toast.success('Login successful!');
     } catch (error: any) {
       console.error('Login error:', error);
       
@@ -46,7 +46,7 @@ export function LoginForm() {
       } else {
         setError('root', {
           type: 'manual',
-          message: 'Login failed. Please try again.',
+          message: error.message || 'Login failed. Please try again.',
         });
       }
       
@@ -69,27 +69,36 @@ export function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="card-content space-y-6">
-        {/* Demo credentials info */}
+        {/* Demo credentials info - collapsible */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Info className="h-5 w-5 text-blue-400 mr-2" />
+              <h3 className="text-sm font-medium text-blue-800">Need Demo Credentials?</h3>
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">Demo Credentials</h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>Use any of these accounts to sign in:</p>
-                <ul className="mt-1 space-y-1">
-                  <li><strong>admin</strong> / admin123 (Administrator)</li>
-                  <li><strong>supervisor</strong> / super123 (Supervisor)</li>
-                  <li><strong>safety</strong> / safety123 (Safety Officer)</li>
-                  <li><strong>operator</strong> / operator123 (Operator)</li>
-                </ul>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowDemoInfo(!showDemoInfo)}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            >
+              {showDemoInfo ? 'Hide' : 'Show'}
+            </button>
           </div>
+          
+          {showDemoInfo && (
+            <div className="mt-3 text-sm text-blue-700">
+              <p className="mb-2">You can use any of these demo accounts:</p>
+              <ul className="space-y-1">
+                <li><strong>admin</strong> / admin123 (Administrator)</li>
+                <li><strong>supervisor</strong> / supervisor123 (Supervisor)</li>
+                <li><strong>safety_officer</strong> / safety123 (Safety Officer)</li>
+                <li><strong>operator</strong> / operator123 (Operator)</li>
+              </ul>
+              <p className="mt-2 text-xs text-blue-600">
+                Or enter your own credentials if you have a real account.
+              </p>
+            </div>
+          )}
         </div>
 
         {errors.root && (
@@ -187,7 +196,7 @@ export function LoginForm() {
 
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            Demo application - Use the provided credentials to sign in
+            Enter your credentials or use demo accounts for testing
           </p>
         </div>
       </form>

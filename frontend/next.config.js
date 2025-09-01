@@ -9,7 +9,6 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 const nextConfig = {
   images: {
     domains: [
-      // Dynamic domain from environment variable
       ...(process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.includes('://') 
         ? [new URL(process.env.NEXT_PUBLIC_API_URL).hostname] 
         : [])

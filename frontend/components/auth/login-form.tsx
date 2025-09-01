@@ -167,7 +167,7 @@ export function LoginForm() {
           )}
         </div>
 
-        <div className="flex items-center justify-center">
+        <div className="flex">
           <div className="flex items-center">
             <input
               {...register('remember_me')}
@@ -177,7 +177,7 @@ export function LoginForm() {
               className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
             />
             <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-              Remember me for 30 days
+              Remember me
             </label>
           </div>
         </div>

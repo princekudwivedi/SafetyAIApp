@@ -1,4 +1,11 @@
 /** @type {import('next').NextConfig} */
+
+// Debug environment variables during build
+console.log('🔍 Environment Variables Debug:');
+console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+console.log('NEXT_PUBLIC_WS_URL:', process.env.NEXT_PUBLIC_WS_URL);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
 const nextConfig = {
   // Vercel deployment configuration
   // No additional config needed - Vercel handles Next.js automatically

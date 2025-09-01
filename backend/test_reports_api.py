@@ -7,10 +7,11 @@ import asyncio
 import motor.motor_asyncio
 from datetime import datetime, timezone, timedelta
 import json
+import os
 
 # MongoDB connection
-MONGODB_URL = "mongodb://localhost:27017"
-DATABASE_NAME = "safety_ai_db"
+MONGODB_URL = os.getenv("MONGODB_URL")
+DATABASE_NAME = os.getenv("DATABASE_NAME")
 
 async def test_reports_api():
     """Test the reports API functionality"""

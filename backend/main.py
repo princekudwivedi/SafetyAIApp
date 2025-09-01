@@ -49,7 +49,7 @@ app = FastAPI(
     
     ## API Base URL
     ```
-    http://localhost:8000/api/v1
+    {settings.API_BASE_URL}/api/v1
     ```
     
     ## Rate Limiting
@@ -79,11 +79,11 @@ app = FastAPI(
     },
     servers=[
         {
-            "url": "http://localhost:8000",
+            "url": settings.API_BASE_URL,
             "description": "Development server"
         },
         {
-            "url": "https://api.safetyai.com",
+            "url": settings.PRODUCTION_API_BASE_URL,
             "description": "Production server"
         }
     ],

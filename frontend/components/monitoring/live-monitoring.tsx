@@ -358,7 +358,7 @@ export function LiveMonitoring() {
       <div className="py-8">
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">Failed to load cameras data</p>
-          <p className="text-sm text-gray-400 mb-4">Check if the backend server is running at http://localhost:8000</p>
+          <p className="text-sm text-gray-400 mb-4">Check if the backend server is running at {process.env.NEXT_PUBLIC_API_URL}</p>
           <div className="space-x-2">
             <button 
               onClick={loadCamerasData}

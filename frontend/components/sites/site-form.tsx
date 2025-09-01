@@ -73,7 +73,7 @@ export function SiteForm({ site, isOpen, onClose, onSubmit, loading = false }: S
       newErrors.contact_phone = 'Invalid phone number format';
     }
 
-    if (formData.worker_count < 0) {
+    if (formData.worker_count != null && formData.worker_count < 0) {
       newErrors.worker_count = 'Worker count cannot be negative';
     }
 

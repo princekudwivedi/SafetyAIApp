@@ -7,9 +7,9 @@ const nextConfig = {
     domains: ['localhost', '127.0.0.1'],
     remotePatterns: [
       {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '8000',
+        protocol: process.env.NEXT_PUBLIC_API_URL?.startsWith('https') ? 'https' : 'http',
+        hostname: process.env.NEXT_PUBLIC_API_URL ? new URL(process.env.NEXT_PUBLIC_API_URL).hostname : 'localhost',
+        port: process.env.NEXT_PUBLIC_API_URL ? new URL(process.env.NEXT_PUBLIC_API_URL).port || (process.env.NEXT_PUBLIC_API_URL.startsWith('https') ? '443' : '8000') : '8000',
         pathname: '/api/**',
       },
     ],
@@ -18,13 +18,13 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
       },
     ];
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
   },
 };
 

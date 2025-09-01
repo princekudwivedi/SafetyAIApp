@@ -31,7 +31,7 @@ const processQueue = (error: any, token: string | null = null) => {
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
   timeout: 60000, // Increased to 60 seconds for video processing
   headers: {
     'Content-Type': 'application/json',

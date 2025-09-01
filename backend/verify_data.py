@@ -7,10 +7,11 @@ Verifies that seeded data is accessible and properly structured
 import asyncio
 import motor.motor_asyncio
 from datetime import datetime
+import os
 
 # MongoDB connection
-MONGODB_URL = "mongodb://localhost:27017"
-DATABASE_NAME = "safety_ai_db"
+MONGODB_URL = os.getenv("MONGODB_URL")
+DATABASE_NAME = os.getenv("DATABASE_NAME")
 
 async def verify_data():
     """Verify that seeded data is accessible and properly structured"""

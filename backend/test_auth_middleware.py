@@ -9,11 +9,11 @@ import json
 import time
 from datetime import datetime, timedelta
 import jwt
-
+import os
 # Configuration
-BASE_URL = "http://localhost:8000"
-SECRET_KEY = "your-secret-key-change-in-production"  # Should match your config
-ALGORITHM = "HS256"
+BASE_URL = os.getenv("API_BASE_URL")
+SECRET_KEY = os.getenv("SECRET_KEY")  # Should match your config
+ALGORITHM = os.getenv("ALGORITHM")
 
 def create_test_token(username: str, expires_in_minutes: int = 30) -> str:
     """Create a test JWT token with specified expiration."""
@@ -53,7 +53,7 @@ def test_authentication_scenarios():
     """Test various authentication scenarios."""
     print("🔐 Testing Authentication Middleware")
     print("=" * 50)
-    
+
     # Test 1: Valid token
     print("1. Testing with valid token...")
     valid_token = create_test_token("testuser", 30)
@@ -102,7 +102,7 @@ def test_token_expiration_edge_cases():
 def main():
     """Main test function."""
     print("🚀 Starting Authentication Middleware Tests")
-    print("Make sure your FastAPI server is running on http://localhost:8000")
+    print(f"Make sure your FastAPI server is running on {BASE_URL}")
     print()
     
     try:
@@ -116,7 +116,7 @@ def main():
         
     except requests.exceptions.ConnectionError:
         print("❌ Error: Could not connect to the server.")
-        print("   Make sure your FastAPI server is running on http://localhost:8000")
+        print(f"   Make sure your FastAPI server is running on {BASE_URL}")
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
 

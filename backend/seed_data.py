@@ -11,10 +11,11 @@ from bson import ObjectId
 import random
 import json
 import hashlib
+import os
 
 # MongoDB connection
-MONGODB_URL = "mongodb://localhost:27017"
-DATABASE_NAME = "safety_ai_db"
+MONGODB_URL = os.getenv("MONGODB_URL")
+DATABASE_NAME = os.getenv("DATABASE_NAME")
 
 # Helper function to hash passwords
 def hash_password(password: str) -> str:

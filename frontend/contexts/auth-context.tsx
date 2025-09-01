@@ -186,8 +186,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: 'temp-user-id',
             username: credentials.username,
             email: `${credentials.username}@example.com`,
+            first_name: credentials.username, // Use username as fallback
+            last_name: '', // Empty string as fallback
             role: UserRole.OPERATOR, // Default role for temporary users
             is_active: true,
+            permissions: [], // Empty permissions array as fallback
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };

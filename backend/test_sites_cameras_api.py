@@ -8,7 +8,7 @@ import httpx
 import sys
 import os
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("API_BASE_URL")
 API_BASE = f"{BASE_URL}/api/v1"
 
 class TestSitesCamerasAPI:

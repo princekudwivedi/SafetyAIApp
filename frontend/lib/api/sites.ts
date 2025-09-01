@@ -114,4 +114,13 @@ export const sitesApi = {
     const response = await apiClient.get(`/api/v1/sites/${siteId}/alerts?limit=${limit}`);
     return response.data;
   },
+
+  // Search sites by text query
+  searchSites: async (query: string, limit: number = 10) => {
+    const params = new URLSearchParams();
+    params.append('query', query);
+    params.append('limit', limit.toString());
+    const response = await apiClient.get(`/api/v1/sites/search?${params.toString()}`);
+    return response.data as Site[];
+  },
 };

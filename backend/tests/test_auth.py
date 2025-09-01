@@ -2,6 +2,7 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 from datetime import datetime
+import os
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -9,8 +10,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 async def test_auth():
     try:
         # Connect to MongoDB
-        client = AsyncIOMotorClient('mongodb://localhost:27017')
-        db = client['safety_ai_db']
+        client = AsyncIOMotorClient(os.getenv("MONGODB_URL"))
+        db = client[os.getenv("DATABASE_NAME")]
         
         print("MongoDB connection successful")
         

@@ -1,6 +1,7 @@
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
+import os
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -8,9 +9,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 async def check_user():
     try:
         # Connect to MongoDB
-        client = AsyncIOMotorClient('mongodb://localhost:27017')
-        db = client['safety_ai_db']
-        
+        client = AsyncIOMotorClient(os.getenv("MONGODB_URL"))
+        db = client[os.getenv("DATABASE_NAME")]
+            
         print("MongoDB connection successful")
         
         # Get admin user details

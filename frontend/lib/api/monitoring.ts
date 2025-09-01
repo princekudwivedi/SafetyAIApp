@@ -99,7 +99,7 @@ export const monitoringApi = {
 
   // Get live video stream URL for a camera
   getLiveVideoStreamUrl(cameraId: string): string {
-    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/video/stream/${cameraId}`;
+    return `${process.env.NEXT_PUBLIC_API_URL}/api/v1/video/stream/${cameraId}`;
   },
 
   // Search cameras by text query
@@ -162,7 +162,7 @@ export const monitoringApi = {
 
   // Get video stream URL for display
   getVideoStreamUrl(cameraId: string): string {
-    return `${apiClient.defaults.baseURL}/api/v1/video/stream/${cameraId}`;
+    return `${process.env.NEXT_PUBLIC_API_URL || apiClient.defaults.baseURL}/api/v1/video/stream/${cameraId}`;
   },
 
   // Upload video file for testing

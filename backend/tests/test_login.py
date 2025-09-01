@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 
 def test_login():
     try:
@@ -10,7 +11,7 @@ def test_login():
         }
         
         response = requests.post(
-            "http://localhost:8000/api/v1/auth/login",
+            os.getenv("API_BASE_URL") + "/api/v1/auth/login",
             json=login_data,
             headers={"Content-Type": "application/json"}
         )
@@ -31,7 +32,7 @@ def test_login():
                 print(f"\n🔒 Testing protected endpoint...")
                 headers = {"Authorization": f"Bearer {token}"}
                 protected_response = requests.get(
-                    "http://localhost:8000/api/v1/cameras/monitoring/status",
+                    os.getenv("API_BASE_URL") + "/api/v1/cameras/monitoring/status",
                     headers=headers
                 )
                 print(f"Protected endpoint status: {protected_response.status_code}")

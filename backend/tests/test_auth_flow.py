@@ -5,8 +5,9 @@ Test the complete authentication flow
 
 import requests
 import json
+import os
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("API_BASE_URL")    
 
 def test_auth_flow():
     """Test the complete authentication flow"""

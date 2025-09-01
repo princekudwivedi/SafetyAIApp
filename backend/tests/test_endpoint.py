@@ -1,8 +1,9 @@
 import requests
 import json
+import os
 
 def test_endpoints():
-    base_url = "http://localhost:8000"
+    base_url = os.getenv("API_BASE_URL")
     
     print("Testing endpoints...")
     

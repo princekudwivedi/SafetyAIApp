@@ -7,9 +7,10 @@ import asyncio
 import aiohttp
 import json
 from datetime import datetime
+import os
 
 # Configuration
-BASE_URL = "http://localhost:8000"
+BASE_URL = os.getenv("API_BASE_URL")
 API_BASE = f"{BASE_URL}/api/v1"
 
 # Test credentials (you may need to adjust these based on your seed data)

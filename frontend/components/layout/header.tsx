@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useAlerts } from '@/hooks/use-alerts';
+import { useSearch } from '@/hooks/use-search';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -20,6 +21,9 @@ import {
   CheckCircle,
   X,
   Plus,
+  Building,
+  Clock,
+  Loader2
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -29,17 +33,22 @@ interface HeaderProps {
 export function Header({ setSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
   const { alerts, isLoading } = useAlerts();
+  const { 
+    searchQuery, 
+    searchResults, 
+    isSearching, 
+    searchError, 
+    setSearchQuery, 
+    clearSearch 
+  } = useSearch();
   const router = useRouter();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
-
-
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -70,6 +79,52 @@ export function Header({ setSidebarOpen }: HeaderProps) {
       setShowSearchResults(true);
     } else {
       setShowSearchResults(false);
+    }
+  };
+
+  const handleSearchResultClick = (result: any) => {
+    setShowSearchResults(false);
+    clearSearch();
+    
+    switch (result.type) {
+      case 'alert':
+        // Navigate to alerts page with the specific alert ID
+        router.push(`/dashboard/alerts?alert=${result.id}`);
+        break;
+      case 'camera':
+        // Navigate to live monitoring page with the specific camera pre-selected
+        router.push(`/dashboard/monitoring?camera=${result.id}`);
+        break;
+      case 'site':
+        // Navigate to sites page with the specific site ID
+        router.push(`/dashboard/sites?site=${result.id}`);
+        break;
+    }
+  };
+
+  const getSearchResultIcon = (type: string) => {
+    switch (type) {
+      case 'alert':
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'camera':
+        return <Camera className="h-4 w-4 text-blue-500" />;
+      case 'site':
+        return <Building className="h-4 w-4 text-green-500" />;
+      default:
+        return <Search className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getSearchResultColor = (type: string) => {
+    switch (type) {
+      case 'alert':
+        return 'bg-red-50 border-red-200';
+      case 'camera':
+        return 'bg-blue-50 border-blue-200';
+      case 'site':
+        return 'bg-green-50 border-green-200';
+      default:
+        return 'bg-gray-50 border-gray-200';
     }
   };
 
@@ -159,24 +214,103 @@ export function Header({ setSidebarOpen }: HeaderProps) {
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             onFocus={() => searchQuery.trim() && setShowSearchResults(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                clearSearch();
+                setShowSearchResults(false);
+              }
+            }}
           />
+          {searchQuery && (
+            <button
+              onClick={clearSearch}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
           
           {/* Search Results Dropdown */}
           {showSearchResults && searchQuery.trim() && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-              <div className="p-2">
-                <div className="text-sm text-gray-500 mb-2">Quick search results...</div>
-                <div className="space-y-1">
-                  <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded">
-                    🔍 Search for "{searchQuery}" in alerts
-                  </button>
-                  <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded">
-                    📹 Search for "{searchQuery}" in cameras
-                  </button>
-                  <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded">
-                    🏗️ Search for "{searchQuery}" in sites
-                  </button>
-                </div>
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 max-h-96 overflow-y-auto">
+              <div className="p-3">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary-600 mr-2" />
+                    <span className="text-sm text-gray-500">Searching...</span>
+                  </div>
+                ) : searchError ? (
+                  <div className="text-center py-4">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-red-400" />
+                    <p className="text-sm text-red-600">{searchError}</p>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="text-center py-4">
+                    <Search className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm text-gray-500">No results found for "{searchQuery}"</p>
+                    <p className="text-xs text-gray-400 mt-1">Try different keywords</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-sm text-gray-500 mb-3 font-medium">
+                      Search Results ({searchResults.length})
+                    </div>
+                    <div className="space-y-2">
+                      {searchResults.map((result) => (
+                        <button
+                          key={`${result.type}-${result.id}`}
+                          onClick={() => handleSearchResultClick(result)}
+                          className={cn(
+                            'w-full text-left p-3 rounded-lg border transition-colors hover:shadow-sm',
+                            getSearchResultColor(result.type)
+                          )}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 mt-1">
+                              {getSearchResultIcon(result.type)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className="text-sm font-medium text-gray-900 truncate">
+                                  {result.title}
+                                </span>
+                                <span className={cn(
+                                  'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                                  result.type === 'alert' ? 'bg-red-100 text-red-800' :
+                                  result.type === 'camera' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-green-100 text-green-800'
+                                )}>
+                                  {result.type}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-1 truncate">
+                                {result.subtitle}
+                              </p>
+                              {result.description && (
+                                <p className="text-xs text-gray-500 truncate">
+                                  {result.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {/* View All Results Button */}
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <button
+                        onClick={() => {
+                          setShowSearchResults(false);
+                          router.push(`/dashboard/search?q=${encodeURIComponent(searchQuery)}`);
+                        }}
+                        className="w-full text-center text-sm text-primary-600 hover:text-primary-500 font-medium"
+                      >
+                        View all results for "{searchQuery}"
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

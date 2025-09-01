@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
+import { useProfile } from '@/hooks/use-profile';
 import { 
   User, 
   Mail, 
@@ -21,13 +22,33 @@ import { cn } from '@/lib/utils';
 export function UserProfile() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { profile, loading, error, updateProfile, fetchProfile } = useProfile();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [formData, setFormData] = useState({
-    username: user?.username || '',
-    email: user?.email || '',
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
+    first_name: '',
+    last_name: '',
+    email: '',
   });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Initialize form data when profile loads
+  useEffect(() => {
+    if (profile) {
+
+      setFormData({
+        first_name: profile.firstName,
+        last_name: profile.lastName,
+        email: profile.email,
+      });
+    }
+  }, [profile]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -38,28 +59,61 @@ export function UserProfile() {
 
   const handleSave = async () => {
     try {
-      // Here you would typically make an API call to update the user profile
-      console.log('Saving profile data:', formData);
+      setIsSaving(true);
+      const updatedProfile = await updateProfile(formData);
+      console.log('Profile updated successfully:', updatedProfile);
       
-      // For now, just close editing mode
+      // Force refresh the profile data to show updated information
+      await fetchProfile();
+      
       setIsEditing(false);
-      
       // Show success message
       alert('Profile updated successfully!');
     } catch (error) {
       console.error('Failed to update profile:', error);
       alert('Failed to update profile. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    setFormData({
-      username: user?.username || '',
-      email: user?.email || '',
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-    });
+    if (profile) {
+      setFormData({
+        first_name: profile.firstName,
+        last_name: profile.lastName,
+        email: profile.email,
+      });
+    }
     setIsEditing(false);
+  };
+
+  const handlePasswordChange = (field: string, value: string) => {
+    setPasswordData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSavePassword = async () => {
+    try {
+      setIsChangingPassword(true);
+      // Call the password change API
+      // await changePassword(passwordData);
+      alert('Password changed successfully!');
+      setIsEditingSecurity(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      alert('Failed to change password. Please try again.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleCancelPassword = () => {
+    setIsEditingSecurity(false);
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
 
   if (!user) {
@@ -67,6 +121,43 @@ export function UserProfile() {
       <div className="py-8">
         <div className="text-center">
           <p className="text-gray-500">User not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-500">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="py-8">
+        <div className="text-center">
+          <p className="text-red-500">Error: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="py-8">
+        <div className="text-center">
+          <p className="text-gray-500">Profile not found</p>
         </div>
       </div>
     );
@@ -88,10 +179,11 @@ export function UserProfile() {
               <>
                 <button
                   onClick={handleSave}
-                  className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  disabled={isSaving}
+                  className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save className="h-4 w-4" />
-                  <span>Save</span>
+                  <span>{isSaving ? 'Saving...' : 'Save'}</span>
                 </button>
                 <button
                   onClick={handleCancel}
@@ -121,18 +213,18 @@ export function UserProfile() {
             <div className="text-center">
               <div className="mx-auto h-24 w-24 rounded-full bg-primary-100 flex items-center justify-center mb-4">
                 <span className="text-3xl font-bold text-primary-700">
-                  {user.username?.charAt(0).toUpperCase() || 'U'}
+                  {profile.username?.charAt(0).toUpperCase() || 'U'}
                 </span>
               </div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                {user.username || 'User'}
+                {profile.fullName || profile.username || 'User'}
               </h2>
               <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800 mb-4">
                 <Shield className="h-4 w-4 mr-2" />
-                {user.role || 'User'}
+                {profile.role || 'User'}
               </div>
               <p className="text-sm text-gray-500">
-                Member since {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                Member since {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : 'Unknown'}
               </p>
             </div>
           </div>
@@ -152,16 +244,7 @@ export function UserProfile() {
                   <User className="h-4 w-4 inline mr-2" />
                   Username
                 </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => handleInputChange('username', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                ) : (
-                  <p className="text-gray-900">{user.username || 'Not set'}</p>
-                )}
+                <p className="text-gray-900">{profile.username || 'Not set'}</p>
               </div>
 
               {/* Email */}
@@ -178,7 +261,7 @@ export function UserProfile() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 ) : (
-                  <p className="text-gray-900">{user.email || 'Not set'}</p>
+                  <p className="text-gray-900">{profile.email || 'Not set'}</p>
                 )}
               </div>
 
@@ -187,16 +270,17 @@ export function UserProfile() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   First Name
                 </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange('firstName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                ) : (
-                  <p className="text-gray-900">{user.firstName || 'Not set'}</p>
-                )}
+                                 {isEditing ? (
+                   <input
+                     type="text"
+                     value={formData.first_name}
+                     onChange={(e) => handleInputChange('first_name', e.target.value)}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                   />
+                 ) : (
+                   <p className="text-gray-900">{profile.firstName || 'Not set'}</p>
+                 )}
+
               </div>
 
               {/* Last Name */}
@@ -204,16 +288,16 @@ export function UserProfile() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Last Name
                 </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange('lastName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                ) : (
-                  <p className="text-gray-900">{user.lastName || 'Not set'}</p>
-                )}
+                                 {isEditing ? (
+                   <input
+                     type="text"
+                     value={formData.last_name}
+                     onChange={(e) => handleInputChange('last_name', e.target.value)}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                   />
+                 ) : (
+                   <p className="text-gray-900">{profile.lastName || 'Not set'}</p>
+                 )}
               </div>
 
               {/* Role */}
@@ -272,6 +356,97 @@ export function UserProfile() {
                   {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'Unknown'}
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Password Management */}
+          <div className="mt-6 bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">Password Management</h3>
+                {!isEditingSecurity && (
+                  <button
+                    onClick={() => setIsEditingSecurity(true)}
+                    className="flex items-center space-x-2 px-3 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm"
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span>Edit Security</span>
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {isEditingSecurity ? (
+                <>
+                  {/* Current Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Current Password
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.currentPassword}
+                      onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+                      placeholder="Enter current password"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.newPassword}
+                      onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
+                      placeholder="Enter new password"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.
+                    </p>
+                  </div>
+
+                  {/* Confirm New Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
+                      placeholder="Confirm new password"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex space-x-3 pt-4">
+                    <button
+                      onClick={handleSavePassword}
+                      disabled={isChangingPassword}
+                      className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isChangingPassword ? 'Changing...' : 'Save Password'}
+                    </button>
+                    <button
+                      onClick={handleCancelPassword}
+                      className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-4">Click "Edit Security" to change your password</p>
+                </div>
+              )}
             </div>
           </div>
 

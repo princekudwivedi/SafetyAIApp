@@ -99,7 +99,17 @@ export const monitoringApi = {
 
   // Get live video stream URL for a camera
   getLiveVideoStreamUrl(cameraId: string): string {
-    return `${apiClient.defaults.baseURL}/api/v1/video/live/${cameraId}`;
+    return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/video/stream/${cameraId}`;
+  },
+
+  // Search cameras by text query
+  async searchCameras(query: string, limit: number = 10): Promise<CameraMonitoringStatus[]> {
+    const params = new URLSearchParams();
+    params.append('query', query);
+    params.append('limit', limit.toString());
+    
+    const response = await apiClient.get(`/api/v1/cameras/search?${params.toString()}`);
+    return response.data;
   },
 
   // Stop video streaming for a camera

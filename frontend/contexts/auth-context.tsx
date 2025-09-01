@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, LoginCredentials } from '../types/auth';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { User, LoginCredentials, UserRole, AuthResponse } from '../types/auth';
 import { authApi } from '../lib/api/auth';
 import { createAuthErrorHandler } from '../lib/api/auth-error-handler';
 
@@ -32,35 +32,109 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkExistingSession();
   }, []);
 
-  const checkExistingSession = () => {
+  // Set up automatic token refresh
+  useEffect(() => {
+    if (user) {
+      const refreshInterval = setInterval(() => {
+        refreshTokensIfNeeded();
+      }, 5 * 60 * 1000); // Check every 5 minutes
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [user]);
+
+  const checkExistingSession = useCallback(async () => {
     try {
       const token = localStorage.getItem('auth_token');
+      const refreshToken = localStorage.getItem('refresh_token');
       const sessionData = localStorage.getItem('auth_session');
       
-      if (token && sessionData) {
+      if (token && refreshToken && sessionData) {
         const session = JSON.parse(sessionData);
         const now = Date.now();
         
-        // Check if session is still valid (24 hours)
+        // Check if session is still valid
         if (session.expiresAt > now) {
           // Session is valid, restore user
           setUser(session.user);
           setIsLoading(false);
           return;
-        } else {
-          // Session expired, clear it
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth_session');
+        } else if (session.refreshExpiresAt > now) {
+          // Access token expired but refresh token is valid, try to refresh
+          try {
+            await refreshTokens(refreshToken);
+            return;
+          } catch (error) {
+            console.error('Failed to refresh tokens:', error);
+          }
         }
+        
+        // Both tokens expired, clear them
+        clearAuthData();
       }
       
       setIsLoading(false);
     } catch (error) {
       console.error('Error checking session:', error);
-      // Clear invalid session data
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_session');
+      clearAuthData();
       setIsLoading(false);
+    }
+  }, []);
+
+  const clearAuthData = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('auth_session');
+    setUser(null);
+  };
+
+  const refreshTokensIfNeeded = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const refreshToken = localStorage.getItem('refresh_token');
+      const sessionData = localStorage.getItem('auth_session');
+      
+      if (!token || !refreshToken || !sessionData) return;
+      
+      const session = JSON.parse(sessionData);
+      const now = Date.now();
+      
+      // If access token expires in less than 5 minutes, refresh it
+      if (session.expiresAt - now < 5 * 60 * 1000) {
+        await refreshTokens(refreshToken);
+      }
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
+    }
+  }, []);
+
+  const refreshTokens = async (refreshToken: string) => {
+    try {
+      console.log('🔄 Refreshing tokens...');
+      const response = await authApi.refreshToken(refreshToken);
+      
+      // Store new tokens
+      localStorage.setItem('auth_token', response.access_token);
+      localStorage.setItem('refresh_token', response.refresh_token);
+      
+      // Update session data
+      const expiresAt = Date.now() + (response.expires_in * 1000);
+      const refreshExpiresAt = Date.now() + (response.refresh_expires_in * 1000);
+      
+      const sessionData = localStorage.getItem('auth_session');
+      if (sessionData) {
+        const session = JSON.parse(sessionData);
+        session.expiresAt = expiresAt;
+        session.refreshExpiresAt = refreshExpiresAt;
+        session.updatedAt = Date.now();
+        localStorage.setItem('auth_session', JSON.stringify(session));
+      }
+      
+      console.log('✅ Tokens refreshed successfully');
+    } catch (error) {
+      console.error('❌ Failed to refresh tokens:', error);
+      clearAuthData();
+      throw error;
     }
   };
 
@@ -72,14 +146,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🌐 API Client baseURL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1');
       
       // Use real backend authentication
-      const response = await authApi.login(credentials);
+      const response: AuthResponse = await authApi.login(credentials);
       
       console.log('✅ Login response received:', response);
       
-      if (response.access_token) {
-        // Store real JWT token
+      if (response.access_token && response.refresh_token) {
+        // Store tokens
         localStorage.setItem('auth_token', response.access_token);
-        console.log('💾 Auth token stored in localStorage');
+        localStorage.setItem('refresh_token', response.refresh_token);
+        console.log('💾 Auth tokens stored in localStorage');
         
         // Get user information from the token or fetch user details
         try {
@@ -88,12 +163,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userData = userResponse;
           console.log('👤 User details received:', userData);
           
+          // Calculate expiration times
+          const expiresAt = Date.now() + (response.expires_in * 1000);
+          const refreshExpiresAt = Date.now() + (response.refresh_expires_in * 1000);
+          
           // Store session data
-          const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
           localStorage.setItem('auth_session', JSON.stringify({
             user: userData,
             expiresAt: expiresAt,
-            createdAt: Date.now()
+            refreshExpiresAt: refreshExpiresAt,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            rememberMe: credentials.remember_me || false
           }));
           
           // Set user
@@ -105,17 +186,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: 'temp-user-id',
             username: credentials.username,
             email: `${credentials.username}@example.com`,
-            role: credentials.role as any,
+            role: UserRole.OPERATOR, // Default role for temporary users
             is_active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
           
-          const expiresAt = Date.now() + (24 * 60 * 60 * 1000);
+          const expiresAt = Date.now() + (response.expires_in * 1000);
+          const refreshExpiresAt = Date.now() + (response.refresh_expires_in * 1000);
+          
           localStorage.setItem('auth_session', JSON.stringify({
             user: userData,
             expiresAt: expiresAt,
-            createdAt: Date.now()
+            refreshExpiresAt: refreshExpiresAt,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            rememberMe: credentials.remember_me || false
           }));
           
           // Set user
@@ -136,12 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🚪 Logging out user');
     
     // Clear all authentication data
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('auth_session');
-    
-    // Update state
-    setUser(null);
+    clearAuthData();
     
     // Redirect to login page
     if (typeof window !== 'undefined') {
@@ -152,44 +233,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const token = localStorage.getItem('auth_token');
+      const refreshToken = localStorage.getItem('refresh_token');
       const sessionData = localStorage.getItem('auth_session');
       
-      if (token && token.startsWith('dummy-token-')) {
-        // For dummy users, check if session is still valid
-        if (sessionData) {
-          const session = JSON.parse(sessionData);
-          if (session.expiresAt > Date.now()) {
-            setUser(session.user);
-            return;
-          } else {
-            // Session expired, clear it
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('auth_session');
-            setUser(null);
-          }
-        }
+      if (!token || !refreshToken || !sessionData) {
+        setUser(null);
         return;
       }
       
-      // For real API users, check session expiration first
-      if (sessionData) {
-        const session = JSON.parse(sessionData);
-        if (session.expiresAt <= Date.now()) {
-          // Session expired, clear it
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth_session');
-          setUser(null);
+      const session = JSON.parse(sessionData);
+      const now = Date.now();
+      
+      // Check if refresh token is still valid
+      if (session.refreshExpiresAt <= now) {
+        // Refresh token expired, clear everything
+        clearAuthData();
+        return;
+      }
+      
+      // Check if access token is expired
+      if (session.expiresAt <= now) {
+        // Access token expired, try to refresh
+        try {
+          await refreshTokens(refreshToken);
+          return;
+        } catch (error) {
+          console.error('Failed to refresh tokens:', error);
+          clearAuthData();
           return;
         }
       }
       
-      const userData = await authApi.getCurrentUser();
-      setUser(userData);
+      // Both tokens are valid, refresh user data
+      try {
+        const userData = await authApi.getCurrentUser();
+        setUser(userData);
+        
+        // Update session with new user data
+        session.user = userData;
+        session.updatedAt = Date.now();
+        localStorage.setItem('auth_session', JSON.stringify(session));
+      } catch (error) {
+        console.error('Failed to refresh user data:', error);
+        // Don't clear auth data here, just keep the existing user
+      }
     } catch (error) {
       console.error('Failed to refresh user:', error);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_session');
-      setUser(null);
+      clearAuthData();
     } finally {
       setIsLoading(false);
     }

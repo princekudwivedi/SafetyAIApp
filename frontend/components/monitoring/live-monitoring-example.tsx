@@ -60,10 +60,10 @@ export function LiveMonitoringWithCentralizedErrorHandling() {
       console.error('Failed to load cameras data:', error);
       
       // Use centralized error handling
-      handleApiError(error);
+      handleApiError(error as Error);
       
       // Check if it's an authentication error
-      if (isAuthError(error)) {
+      if (isAuthError(error as Error)) {
         // Authentication errors are handled centrally, just set local state
         setHasError(true);
         setErrorMessage('Authentication failed. Please log in again.');
@@ -71,7 +71,7 @@ export function LiveMonitoringWithCentralizedErrorHandling() {
       } else {
         // For other errors, show user-friendly message
         setHasError(true);
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(getErrorMessage(error as Error));
         setCameras([]);
       }
     } finally {
@@ -88,10 +88,10 @@ export function LiveMonitoringWithCentralizedErrorHandling() {
       console.error('Failed to load recordings:', error);
       
       // Use centralized error handling
-      handleApiError(error);
+      handleApiError(error as Error);
       
       // For recording errors, we might want to show a specific message
-      if (isAuthError(error)) {
+      if (isAuthError(error as Error)) {
         // Auth errors are handled centrally
         return;
       }
@@ -122,10 +122,10 @@ export function LiveMonitoringWithCentralizedErrorHandling() {
       console.error('Failed to start video stream:', error);
       
       // Use centralized error handling
-      handleApiError(error);
+      handleApiError(error as Error);
       
       // Show user-friendly error message
-      if (!isAuthError(error)) {
+      if (!isAuthError(error as Error)) {
         setErrorMessage('Failed to start video stream. Please try again.');
       }
     } finally {
@@ -153,10 +153,10 @@ export function LiveMonitoringWithCentralizedErrorHandling() {
       console.error('Failed to stop video stream:', error);
       
       // Use centralized error handling
-      handleApiError(error);
+      handleApiError(error as Error);
       
       // Show user-friendly error message
-      if (!isAuthError(error)) {
+      if (!isAuthError(error as Error)) {
         setErrorMessage('Failed to stop video stream. Please try again.');
       }
     }
@@ -185,10 +185,10 @@ export function LiveMonitoringWithCentralizedErrorHandling() {
       console.error('Failed to start recording:', error);
       
       // Use centralized error handling
-      handleApiError(error);
+      handleApiError(error as Error);
       
       // Show user-friendly error message
-      if (!isAuthError(error)) {
+      if (!isAuthError(error as Error)) {
         setErrorMessage('Failed to start recording. Please try again.');
       }
     }
@@ -217,10 +217,10 @@ export function LiveMonitoringWithCentralizedErrorHandling() {
       console.error('Failed to stop recording:', error);
       
       // Use centralized error handling
-      handleApiError(error);
+      handleApiError(error as Error);
       
       // Show user-friendly error message
-      if (!isAuthError(error)) {
+      if (!isAuthError(error as Error)) {
         setErrorMessage('Failed to stop recording. Please try again.');
       }
     }

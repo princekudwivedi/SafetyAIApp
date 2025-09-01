@@ -8,7 +8,7 @@ import { AlertsPage } from '@/components/alerts/alerts-page';
 import { ReportsPage } from '@/components/reports/reports-page';
 import { SitesPage } from '@/components/sites/sites-page';
 import { CamerasPage } from '@/components/cameras/cameras-page';
-import UsersPage from '@/components/users/users-page';
+import { UsersPage } from '@/components/users/users-page';
 import { SettingsPage as SystemSettingsPage } from '@/components/settings/settings-page';
 import { SettingsPage as UserSettingsPage } from '@/components/dashboard/settings';
 import { UserProfile } from '@/components/dashboard/user-profile';

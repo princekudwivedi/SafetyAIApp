@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
 import { MetricCard } from './metric-card';
 import { SafetyChart } from './safety-chart';
+
 import { RecentAlerts } from './recent-alerts';
 import { SystemStatus } from './system-status';
 import { TrendingUp, TrendingDown, AlertTriangle, Video, Users, Shield } from 'lucide-react';
@@ -43,26 +44,20 @@ export function DashboardOverview() {
 
   // Single data loading function that fetches all data at once
   const loadAllDashboardData = useCallback(async () => {
-    // Prevent multiple data loads
-    if (dataLoadedRef.current) {
-      console.log('🔄 Data already loaded, skipping...'); // Debug log
-      return;
-    }
+         // Prevent multiple data loads
+     if (dataLoadedRef.current) {
+       return;
+     }
     
-    try {
-      console.log('🔄 Loading all dashboard data...'); // Debug log
-      setIsLoading(true);
-      setHasError(false);
-      
-      // Fetch all data in parallel to minimize API calls
-      const [apiStats, apiAlertsSummary] = await Promise.all([
-        dashboardApi.getDashboardStats(),
-        dashboardApi.getAlertsSummary()
-      ]);
-      
-      console.log('✅ Dashboard data loaded successfully'); // Debug log
-      console.log('📊 Dashboard Stats:', apiStats); // Debug log
-      console.log('🚨 Alerts Summary:', apiAlertsSummary); // Debug log
+         try {
+       setIsLoading(true);
+       setHasError(false);
+       
+       // Fetch all data in parallel to minimize API calls
+       const [apiStats, apiAlertsSummary] = await Promise.all([
+         dashboardApi.getDashboardStats(),
+         dashboardApi.getAlertsSummary()
+       ]);
       
       // Store raw data for child components
       setDashboardData(apiStats);
@@ -79,19 +74,17 @@ export function DashboardOverview() {
         safetyScore: apiStats.safety_score,
       });
       
-      // Mark data as loaded
-      dataLoadedRef.current = true;
-    } catch (error) {
-      console.error('❌ Failed to load dashboard data:', error);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
-    }
+             // Mark data as loaded
+       dataLoadedRef.current = true;
+     } catch (error) {
+       console.error('Failed to load dashboard data:', error);
+       setHasError(true);
+     } finally {
+       setIsLoading(false);
+     }
   }, []);
 
-  useEffect(() => {
-    console.log('🚀 Dashboard component mounted, loading data...'); // Debug log
-    console.log('📊 Component ID:', Math.random().toString(36).substr(2, 9)); // Debug log
+     useEffect(() => {
     
     try {
       // Subscribe to real-time updates
@@ -115,11 +108,10 @@ export function DashboardOverview() {
       // Load initial data only once
       loadAllDashboardData();
 
-      return () => {
-        console.log('🧹 Dashboard component unmounting, cleaning up...'); // Debug log
-        unsubscribeStats();
-        unsubscribeAlerts();
-      };
+             return () => {
+         unsubscribeStats();
+         unsubscribeAlerts();
+       };
     } catch (error) {
       console.error('Dashboard initialization error:', error);
       setHasError(true);
@@ -257,17 +249,19 @@ export function DashboardOverview() {
         </div>
       </div>
 
+      {/* Weekly Safety Violations - Full Width */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <SafetyChart 
+          dashboardData={dashboardData}
+          alertsSummary={alertsSummary}
+          isLoading={isLoading}
+        />
+      </div>
+
+
+
       {/* Charts and Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Weekly Safety Violations</h2>
-          <SafetyChart 
-            dashboardData={dashboardData}
-            alertsSummary={alertsSummary}
-            isLoading={isLoading}
-          />
-        </div>
-        
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Alerts</h2>
           <RecentAlerts 
@@ -275,13 +269,14 @@ export function DashboardOverview() {
             isLoading={isLoading}
           />
         </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
+          <SystemStatus />
+        </div>
       </div>
 
-      {/* System Status */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
-        <SystemStatus />
-      </div>
+
     </div>
   );
 }

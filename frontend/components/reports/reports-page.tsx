@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
-import { BarChart3, Download, Calendar, Filter, TrendingUp, TrendingDown, AlertTriangle, Camera, Users } from 'lucide-react';
+import { BarChart3, Download, Calendar, Filter, TrendingUp, TrendingDown, AlertTriangle, Camera, Users, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useReports } from '@/hooks/use-reports';
 import {
   LineChart,
   Line,
@@ -19,49 +20,25 @@ import {
   Cell,
 } from 'recharts';
 
-interface ReportData {
-  period: string;
-  violations: number;
-  alerts: number;
-  safetyScore: number;
-}
-
-const weeklyData: ReportData[] = [
-  { period: 'Week 1', violations: 45, alerts: 52, safetyScore: 78 },
-  { period: 'Week 2', violations: 38, alerts: 41, safetyScore: 82 },
-  { period: 'Week 3', violations: 42, alerts: 48, safetyScore: 79 },
-  { period: 'Week 4', violations: 35, alerts: 39, safetyScore: 85 },
-  { period: 'Week 5', violations: 28, alerts: 32, safetyScore: 88 },
-  { period: 'Week 6', violations: 31, alerts: 35, safetyScore: 86 },
-  { period: 'Week 7', violations: 25, alerts: 28, safetyScore: 90 },
-  { period: 'Week 8', violations: 22, alerts: 25, safetyScore: 92 },
-];
-
-const violationTypes = [
-  { name: 'No Hard Hat', value: 35, color: '#ef4444' },
-  { name: 'No Safety Vest', value: 25, color: '#f59e0b' },
-  { name: 'Proximity Violation', value: 20, color: '#3b82f6' },
-  { name: 'Unauthorized Access', value: 15, color: '#8b5cf6' },
-  { name: 'Equipment Misuse', value: 5, color: '#10b981' },
-];
-
-const cameraPerformance = [
-  { camera: 'CAM_01', violations: 12, uptime: 98, alerts: 15 },
-  { camera: 'CAM_02', violations: 8, uptime: 95, alerts: 10 },
-  { camera: 'CAM_03', violations: 15, uptime: 87, alerts: 18 },
-  { camera: 'CAM_04', violations: 5, uptime: 92, alerts: 7 },
-  { camera: 'CAM_05', violations: 18, uptime: 89, alerts: 22 },
-];
-
 export function ReportsPage() {
   const { subscribe, isConnected } = useWebSocket();
   const [selectedPeriod, setSelectedPeriod] = useState('8');
   const [selectedReport, setSelectedReport] = useState('overview');
-  const [hasError, setHasError] = useState(false);
-  const [chartData, setChartData] = useState({
-    weeklyData: weeklyData,
-    violationTypes: violationTypes,
-    cameraPerformance: cameraPerformance
+  const [selectedSiteId, setSelectedSiteId] = useState<string | undefined>();
+  
+  // Use the reports hook to fetch dynamic data
+  const { 
+    overview, 
+    violations, 
+    cameras, 
+    trends,
+    loading, 
+    error, 
+    exportReport, 
+    refreshAll 
+  } = useReports({ 
+    period: selectedPeriod, 
+    siteId: selectedSiteId 
   });
 
   // Validate data to ensure no NaN or undefined values
@@ -76,60 +53,36 @@ export function ReportsPage() {
     });
   };
 
+  // Get validated data from API or use empty arrays as fallback
+  const weeklyData = overview?.weeklyData || [];
+  const violationTypes = overview?.violationTypes || [];
+  const cameraPerformance = overview?.cameraPerformance || [];
+  
   const validatedWeeklyData = validateChartData(weeklyData);
   const validatedViolationTypes = validateChartData(violationTypes);
   const validatedCameraPerformance = validateChartData(cameraPerformance);
 
   useEffect(() => {
-    try {
-      // Process chart data to ensure proper formatting
-      const processedWeeklyData = validatedWeeklyData.map(item => ({
-        ...item,
-        violations: Number(item.violations) || 0,
-        alerts: Number(item.alerts) || 0,
-        safetyScore: Number(item.safetyScore) || 0
-      }));
+    // Subscribe to real-time updates for reports
+    const unsubscribeStats = subscribe('dashboard_stats', (data) => {
+      if (data.type === 'dashboard_stats') {
+        // Update report data in real-time
+        console.log('Received updated stats:', data.payload);
+        refreshAll(); // Refresh all data when new stats arrive
+      }
+    });
 
-      const processedViolationTypes = validatedViolationTypes.map(item => ({
-        ...item,
-        value: Number(item.value) || 0
-      }));
-
-      const processedCameraPerformance = validatedCameraPerformance.map(item => ({
-        ...item,
-        violations: Number(item.violations) || 0,
-        uptime: Number(item.uptime) || 0,
-        alerts: Number(item.alerts) || 0
-      }));
-
-      setChartData({
-        weeklyData: processedWeeklyData,
-        violationTypes: processedViolationTypes,
-        cameraPerformance: processedCameraPerformance
-      });
-
-      // Subscribe to real-time updates for reports
-      const unsubscribeStats = subscribe('dashboard_stats', (data) => {
-        if (data.type === 'dashboard_stats') {
-          // Update report data in real-time
-          console.log('Received updated stats:', data.payload);
-        }
-      });
-
-      return () => {
-        unsubscribeStats();
-      };
-    } catch (error) {
-      console.error('Reports page initialization error:', error);
-      setHasError(true);
-    }
-  }, [subscribe]);
+    return () => {
+      unsubscribeStats();
+    };
+  }, [subscribe, refreshAll]);
 
   const handleExport = (format: 'csv' | 'json' | 'pdf') => {
-    // In a real app, this would call the API to export data
-    console.log(`Exporting ${selectedReport} report in ${format} format`);
-    // For now, just show a success message
-    alert(`Exporting ${selectedReport} report in ${format.toUpperCase()} format...`);
+    try {
+      exportReport(selectedReport, format);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
   };
 
   const getTrendIndicator = (current: number, previous: number) => {
@@ -143,19 +96,24 @@ export function ReportsPage() {
 
   const currentWeek = weeklyData[weeklyData.length - 1];
   const previousWeek = weeklyData[weeklyData.length - 2];
-  const violationTrend = getTrendIndicator(currentWeek.violations, previousWeek.violations);
-  const safetyTrend = getTrendIndicator(currentWeek.safetyScore, previousWeek.safetyScore);
+  
+  // Only calculate trends if we have data
+  const violationTrend = currentWeek && previousWeek 
+    ? getTrendIndicator(currentWeek.violations, previousWeek.violations)
+    : { trend: 'stable', percentage: 0 };
+    
+  const safetyTrend = currentWeek && previousWeek 
+    ? getTrendIndicator(currentWeek.safetyScore, previousWeek.safetyScore)
+    : { trend: 'stable', percentage: 0 };
 
-  if (hasError) {
+  if (error) {
     return (
       <div className="py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <h2 className="text-lg font-medium text-red-800 mb-2">Reports Error</h2>
-          <p className="text-red-600 mb-4">There was an issue loading the reports data.</p>
+          <p className="text-red-600 mb-4">{error}</p>
           <button 
-            onClick={() => {
-              setHasError(false);
-            }}
+            onClick={() => refreshAll()}
             className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
           >
             Retry
@@ -165,13 +123,32 @@ export function ReportsPage() {
     );
   }
 
+  // Show loading state
+  if (loading && !overview) {
+    return (
+      <div className="py-8">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+          <h2 className="text-lg font-medium text-blue-800 mb-2">Loading Reports</h2>
+          <p className="text-blue-600 mb-4">Please wait while we fetch your reports data...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
   // Ensure we have valid data before rendering charts
-  if (!chartData.weeklyData.length || !chartData.violationTypes.length) {
+  if (!validatedWeeklyData.length || !validatedViolationTypes.length) {
     return (
       <div className="py-8">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
           <h2 className="text-lg font-medium text-yellow-800 mb-2">No Data Available</h2>
           <p className="text-yellow-600 mb-4">Chart data is not available at the moment.</p>
+          <button 
+            onClick={() => refreshAll()}
+            className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700"
+          >
+            Refresh Data
+          </button>
         </div>
       </div>
     );
@@ -220,6 +197,27 @@ export function ReportsPage() {
               <option value="26">Last 6 Months</option>
             </select>
 
+            <select
+              value={selectedSiteId || ''}
+              onChange={(e) => setSelectedSiteId(e.target.value || undefined)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="">All Sites</option>
+              <option value="SITE_001">Downtown Construction</option>
+              <option value="SITE_002">Highway Bridge</option>
+              <option value="SITE_003">Shopping Mall</option>
+              <option value="SITE_004">Industrial Warehouse</option>
+            </select>
+
+            <button
+              onClick={() => refreshAll()}
+              disabled={loading}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+
             <button
               onClick={() => handleExport('csv')}
               className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -229,11 +227,11 @@ export function ReportsPage() {
             </button>
 
             <button
-              onClick={() => handleExport('pdf')}
-              className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              onClick={() => handleExport('json')}
+              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
             >
               <Download className="h-4 w-4" />
-              <span>Export PDF</span>
+              <span>Export JSON</span>
             </button>
           </div>
         </div>
@@ -248,20 +246,26 @@ export function ReportsPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Total Violations</p>
-              <p className="text-2xl font-bold text-red-600">{currentWeek.violations}</p>
-              <div className="flex items-center text-xs">
-                {violationTrend.trend === 'up' ? (
-                  <TrendingUp className="h-3 w-3 text-red-500 mr-1" />
-                ) : violationTrend.trend === 'down' ? (
-                  <TrendingDown className="h-3 w-3 text-green-500 mr-1" />
-                ) : null}
-                <span className={cn(
-                  violationTrend.trend === 'up' ? 'text-red-500' : 
-                  violationTrend.trend === 'down' ? 'text-green-500' : 'text-gray-500'
-                )}>
-                  {violationTrend.trend === 'up' ? '+' : ''}{violationTrend.percentage}% vs last week
-                </span>
-              </div>
+              <p className="text-2xl font-bold text-red-600">{overview?.keyMetrics.totalViolations || 0}</p>
+                             <div className="flex items-center text-xs">
+                 {currentWeek && previousWeek ? (
+                   <>
+                     {violationTrend.trend === 'up' ? (
+                       <TrendingUp className="h-3 w-3 text-red-500 mr-1" />
+                     ) : violationTrend.trend === 'down' ? (
+                       <TrendingDown className="h-3 w-3 text-green-500 mr-1" />
+                     ) : null}
+                     <span className={cn(
+                       violationTrend.trend === 'up' ? 'text-red-500' : 
+                       violationTrend.trend === 'down' ? 'text-green-500' : 'text-gray-500'
+                     )}>
+                       {violationTrend.trend === 'up' ? '+' : ''}{violationTrend.percentage}% vs last week
+                     </span>
+                   </>
+                 ) : (
+                   <span className="text-gray-500">No trend data available</span>
+                 )}
+               </div>
             </div>
           </div>
         </div>
@@ -273,20 +277,26 @@ export function ReportsPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Safety Score</p>
-              <p className="text-2xl font-bold text-blue-600">{currentWeek.safetyScore}%</p>
-              <div className="flex items-center text-xs">
-                {safetyTrend.trend === 'up' ? (
-                  <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                ) : safetyTrend.trend === 'down' ? (
-                  <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
-                ) : null}
-                <span className={cn(
-                  safetyTrend.trend === 'up' ? 'text-green-500' : 
-                  safetyTrend.trend === 'down' ? 'text-red-500' : 'text-gray-500'
-                )}>
-                  {safetyTrend.trend === 'up' ? '+' : ''}{safetyTrend.percentage}% vs last week
-                </span>
-              </div>
+              <p className="text-2xl font-bold text-blue-600">{overview?.keyMetrics.overallSafetyScore || 0}%</p>
+                             <div className="flex items-center text-xs">
+                 {currentWeek && previousWeek ? (
+                   <>
+                     {safetyTrend.trend === 'up' ? (
+                       <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                     ) : safetyTrend.trend === 'down' ? (
+                       <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+                     ) : null}
+                     <span className={cn(
+                       safetyTrend.trend === 'up' ? 'text-green-500' : 
+                       safetyTrend.trend === 'down' ? 'text-red-500' : 'text-gray-500'
+                     )}>
+                       {safetyTrend.trend === 'up' ? '+' : ''}{safetyTrend.percentage}% vs last week
+                     </span>
+                   </>
+                 ) : (
+                   <span className="text-gray-500">No trend data available</span>
+                 )}
+               </div>
             </div>
           </div>
         </div>
@@ -298,7 +308,7 @@ export function ReportsPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Active Cameras</p>
-              <p className="text-2xl font-bold text-yellow-600">5</p>
+              <p className="text-2xl font-bold text-yellow-600">{overview?.keyMetrics.activeCameras || 0}</p>
               <p className="text-xs text-gray-500">98% uptime average</p>
             </div>
           </div>
@@ -310,9 +320,9 @@ export function ReportsPage() {
               <Users className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Workers Monitored</p>
-              <p className="text-2xl font-bold text-green-600">45</p>
-              <p className="text-xs text-gray-500">+3 this week</p>
+              <p className="text-sm font-medium text-gray-600">Total Alerts</p>
+              <p className="text-2xl font-bold text-green-600">{overview?.keyMetrics.totalAlerts || 0}</p>
+              <p className="text-xs text-gray-500">This period</p>
             </div>
           </div>
         </div>
@@ -323,60 +333,60 @@ export function ReportsPage() {
         {/* Weekly Trends */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Safety Trends</h3>
-          <div style={{ width: '100%', height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData.weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="period" />
-                <YAxis />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="violations"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  name="Violations"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="safetyScore"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  name="Safety Score"
-                  yAxisId={1}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+                  <div style={{ width: '100%', height: '300px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={validatedWeeklyData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="period" />
+              <YAxis />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="violations"
+                stroke="#ef4444"
+                strokeWidth={2}
+                name="Violations"
+              />
+              <Line
+                type="monotone"
+                dataKey="safetyScore"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                name="Safety Score"
+                yAxisId={1}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
         </div>
 
         {/* Violation Types Distribution */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Violation Types Distribution</h3>
-          <div style={{ width: '100%', height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData.violationTypes}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => {
-                    if (percent === undefined || isNaN(percent)) return name;
-                    return `${name} ${(percent * 100).toFixed(0)}%`;
-                  }}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {chartData.violationTypes.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+                  <div style={{ width: '100%', height: '300px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={validatedViolationTypes}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }: { name: string; percent?: number }) => {
+                  if (percent === undefined || isNaN(percent)) return name;
+                  return `${name} ${(percent * 100).toFixed(0)}%`;
+                }}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {validatedViolationTypes.map((entry: any, index: number) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
         </div>
       </div>
 
@@ -407,7 +417,7 @@ export function ReportsPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {chartData.cameraPerformance.map((camera) => (
+              {validatedCameraPerformance.map((camera: any) => (
                 <tr key={camera.camera} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {camera.camera}
@@ -444,7 +454,7 @@ export function ReportsPage() {
       </div>
 
       {/* Connection Status */}
-      <div className="mt-6">
+      <div className="mt-6 flex items-center space-x-4">
         <div className={cn(
           'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium',
           isConnected 
@@ -457,6 +467,13 @@ export function ReportsPage() {
           )} />
           {isConnected ? 'WebSocket Connected' : 'WebSocket Disconnected'}
         </div>
+        
+        {loading && (
+          <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            Loading...
+          </div>
+        )}
       </div>
     </div>
   );

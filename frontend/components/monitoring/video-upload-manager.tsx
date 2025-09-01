@@ -127,7 +127,7 @@ export function VideoUploadManager({ selectedCamera, onAlertGenerated }: VideoUp
           setUploadProgress(prev => ({
             ...prev,
             [uploadId]: status.processing_progress
-          }));
+          } as { [key: string]: number }));
         }
         
         // Stop polling if processing is complete

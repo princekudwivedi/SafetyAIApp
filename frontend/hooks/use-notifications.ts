@@ -16,7 +16,7 @@ export interface UseNotificationsReturn {
   unreadCount: number;
   markAsRead: (notificationId: string) => void;
   markAllAsRead: () => void;
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => void;
+  addNotification: (notification: Notification) => void;
   removeNotification: (notificationId: string) => void;
   clearAll: () => void;
 }

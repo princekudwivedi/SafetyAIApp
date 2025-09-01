@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
+  remember_me: z.boolean().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -26,17 +27,29 @@ export function LoginForm() {
     handleSubmit,
     formState: { errors },
     setError,
+    watch,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      remember_me: false,
+    },
   });
+
+  const rememberMe = watch('remember_me');
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       setIsLoading(true);
+      console.log('🔐 Frontend login form data:', data);
+      console.log('🔐 remember_me value:', data.remember_me);
+      console.log('🔐 remember_me type:', typeof data.remember_me);
+      
       await login(data);
       toast.success('Login successful!');
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
+      console.error('❌ Error response:', error.response);
+      console.error('❌ Error message:', error.message);
       
       if (error.response?.data?.detail) {
         setError('root', {
@@ -82,10 +95,10 @@ export function LoginForm() {
               <div className="mt-2 text-sm text-blue-700">
                 <p>Use any of these accounts to sign in:</p>
                 <ul className="mt-1 space-y-1">
-                  <li><strong>admin</strong> / admin123 (Administrator)</li>
-                  <li><strong>supervisor</strong> / super123 (Supervisor)</li>
-                  <li><strong>safety</strong> / safety123 (Safety Officer)</li>
-                  <li><strong>operator</strong> / operator123 (Operator)</li>
+                  <li><strong>admin</strong>/admin123 (Administrator)</li>
+                  <li><strong>supervisor</strong>/super123 (Supervisor)</li>
+                  <li><strong>safety</strong>/safety123 (Safety Officer)</li>
+                  <li><strong>operator</strong>/operator123 (Operator)</li>
                 </ul>
               </div>
             </div>
@@ -157,16 +170,25 @@ export function LoginForm() {
         <div className="flex items-center justify-center">
           <div className="flex items-center">
             <input
+              {...register('remember_me')}
               id="remember-me"
               name="remember-me"
               type="checkbox"
               className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
             />
             <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-              Remember me
+              Remember me for 30 days
             </label>
           </div>
         </div>
+
+        {rememberMe && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+            <p className="text-sm text-green-700">
+              <span className="font-medium">Remember Me Enabled:</span> You'll stay signed in for 30 days on this device.
+            </p>
+          </div>
+        )}
 
         <div>
           <button
@@ -183,12 +205,6 @@ export function LoginForm() {
               'Sign in'
             )}
           </button>
-        </div>
-
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            Demo application - Use the provided credentials to sign in
-          </p>
         </div>
       </form>
     </div>

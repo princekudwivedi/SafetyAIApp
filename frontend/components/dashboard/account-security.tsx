@@ -6,16 +6,12 @@ import { useRouter } from 'next/navigation';
 import { 
   Shield, 
   Lock, 
-  Key, 
-  Smartphone, 
-  Mail, 
   Save, 
   X,
   Eye,
   EyeOff,
   CheckCircle,
-  AlertTriangle,
-  Clock
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,20 +27,11 @@ export function AccountSecurity() {
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-    twoFactorEnabled: false,
-    backupCodes: [''],
-    sessionTimeout: 30,
-    loginNotifications: true,
-    suspiciousActivityAlerts: true,
   });
 
   const [securityStatus, setSecurityStatus] = useState({
     passwordStrength: 'strong',
     lastPasswordChange: '2024-01-15',
-    twoFactorStatus: 'enabled',
-    lastLogin: '2024-01-20 14:30',
-    loginLocation: 'New York, NY',
-    deviceInfo: 'Chrome 120.0.0.0 on Windows 10',
   });
 
   const handleInputChange = (field: string, value: any) => {
@@ -87,11 +74,6 @@ export function AccountSecurity() {
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
-      twoFactorEnabled: false,
-      backupCodes: [''],
-      sessionTimeout: 30,
-      loginNotifications: true,
-      suspiciousActivityAlerts: true,
     });
     setIsEditing(false);
   };
@@ -114,7 +96,7 @@ export function AccountSecurity() {
       case 'weak':
         return <AlertTriangle className="h-4 w-4" />;
       case 'medium':
-        return <Clock className="h-4 w-4" />;
+        return <AlertTriangle className="h-4 w-4" />;
       case 'strong':
         return <CheckCircle className="h-4 w-4" />;
       default:
@@ -140,7 +122,7 @@ export function AccountSecurity() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Account Security</h1>
             <p className="mt-2 text-gray-600">
-              Manage your account security settings and monitor activity
+              Manage your account security settings
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -199,14 +181,6 @@ export function AccountSecurity() {
                 )}>
                   {getPasswordStrengthIcon(securityStatus.passwordStrength)}
                   <span className="ml-1 capitalize">{securityStatus.passwordStrength}</span>
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">2FA Status</span>
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Enabled
                 </span>
               </div>
               
@@ -298,189 +272,6 @@ export function AccountSecurity() {
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
                   </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Two-Factor Authentication */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                <Key className="h-5 w-5 mr-2" />
-                Two-Factor Authentication
-              </h3>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Enable 2FA</p>
-                  <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.twoFactorEnabled}
-                    onChange={(e) => handleInputChange('twoFactorEnabled', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                </label>
-              </div>
-
-              {formData.twoFactorEnabled && (
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <Smartphone className="h-5 w-5 text-blue-400" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-blue-800">
-                        Setup Required
-                      </h3>
-                      <div className="mt-2 text-sm text-blue-700">
-                        <p>Scan the QR code with your authenticator app to complete 2FA setup.</p>
-                      </div>
-                      <div className="mt-4">
-                        <button className="bg-blue-100 text-blue-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-200">
-                          Setup 2FA
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Session Management */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                <Clock className="h-5 w-5 mr-2" />
-                Session Management
-              </h3>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Session Timeout (minutes)
-                </label>
-                <select
-                  value={formData.sessionTimeout}
-                  onChange={(e) => handleInputChange('sessionTimeout', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value={15}>15 minutes</option>
-                  <option value={30}>30 minutes</option>
-                  <option value={60}>1 hour</option>
-                  <option value={120}>2 hours</option>
-                  <option value={0}>Never</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Login Notifications</p>
-                  <p className="text-sm text-gray-500">Get notified of new login attempts</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.loginNotifications}
-                    onChange={(e) => handleInputChange('loginNotifications', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Suspicious Activity Alerts</p>
-                  <p className="text-sm text-gray-500">Get alerts for unusual login patterns</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.suspiciousActivityAlerts}
-                    onChange={(e) => handleInputChange('suspiciousActivityAlerts', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                <Clock className="h-5 w-5 mr-2" />
-                Recent Activity
-              </h3>
-            </div>
-            
-            <div className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      Successful login
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {securityStatus.lastLogin} • {securityStatus.loginLocation}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {securityStatus.deviceInfo}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Shield className="h-4 w-4 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      Password changed
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {securityStatus.lastPasswordChange}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Password updated successfully
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                      <Key className="h-4 w-4 text-purple-600" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      2FA enabled
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      2024-01-10 09:15
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Two-factor authentication activated
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>

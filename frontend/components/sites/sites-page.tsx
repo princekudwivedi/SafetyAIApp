@@ -2,82 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
-import { Building, Plus, Edit, Trash2, MapPin, Phone, Users, Camera, AlertTriangle, Search, Filter } from 'lucide-react';
+import { useSites } from '@/hooks/use-sites';
+import { SiteForm } from './site-form';
+import { Building, Plus, Edit, Trash2, MapPin, Phone, Users, Camera, AlertTriangle, Search, Filter, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface Site {
-  id: string;
-  name: string;
-  location: string;
-  contactPerson: string;
-  contactPhone: string;
-  contactEmail: string;
-  status: 'active' | 'inactive' | 'maintenance';
-  cameraCount: number;
-  workerCount: number;
-  activeAlerts: number;
-  createdAt: string;
-  lastUpdated: string;
-}
-
-const mockSites: Site[] = [
-  {
-    id: 'SITE_001',
-    name: 'Downtown Construction Project',
-    location: '123 Main Street, Downtown',
-    contactPerson: 'John Smith',
-    contactPhone: '+1 (555) 123-4567',
-    contactEmail: 'john.smith@construction.com',
-    status: 'active',
-    cameraCount: 3,
-    workerCount: 25,
-    activeAlerts: 2,
-    createdAt: '2024-01-15',
-    lastUpdated: '2024-01-20',
-  },
-  {
-    id: 'SITE_002',
-    name: 'Industrial Warehouse Complex',
-    location: '456 Industrial Blvd, Westside',
-    contactPerson: 'Sarah Johnson',
-    contactPhone: '+1 (555) 234-5678',
-    contactEmail: 'sarah.johnson@warehouse.com',
-    status: 'active',
-    cameraCount: 2,
-    workerCount: 18,
-    activeAlerts: 1,
-    createdAt: '2024-01-10',
-    lastUpdated: '2024-01-19',
-  },
-  {
-    id: 'SITE_003',
-    name: 'Residential Development Phase 1',
-    location: '789 Oak Avenue, North District',
-    contactPerson: 'Mike Davis',
-    contactPhone: '+1 (555) 345-6789',
-    contactEmail: 'mike.davis@residential.com',
-    status: 'maintenance',
-    cameraCount: 1,
-    workerCount: 12,
-    activeAlerts: 0,
-    createdAt: '2024-01-05',
-    lastUpdated: '2024-01-18',
-  },
-  {
-    id: 'SITE_004',
-    name: 'Highway Bridge Project',
-    location: 'Highway 101, Exit 45',
-    contactPerson: 'Lisa Wilson',
-    contactPhone: '+1 (555) 456-7890',
-    contactEmail: 'lisa.wilson@bridge.com',
-    status: 'active',
-    cameraCount: 4,
-    workerCount: 32,
-    activeAlerts: 3,
-    createdAt: '2024-01-12',
-    lastUpdated: '2024-01-21',
-  },
-];
+import { Site, SiteCreate, SiteUpdate } from '@/lib/api/sites';
 
 const statusColors = {
   active: 'bg-green-100 text-green-800 border-green-200',
@@ -93,30 +22,37 @@ const statusIcons = {
 
 export function SitesPage() {
   const { subscribe, isConnected } = useWebSocket();
-  const [sites, setSites] = useState<Site[]>(mockSites);
-  const [filteredSites, setFilteredSites] = useState<Site[]>(mockSites);
+  const { 
+    sites, 
+    loading, 
+    error, 
+    stats, 
+    refreshSites, 
+    createSite, 
+    updateSite, 
+    deleteSite 
+  } = useSites();
+  
+  const [filteredSites, setFilteredSites] = useState<Site[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
     // Subscribe to site updates
     const unsubscribeSiteUpdate = subscribe('site_update', (data) => {
       if (data.type === 'site_update') {
-        setSites(prev => prev.map(site => 
-          site.id === data.payload.id 
-            ? { ...site, ...data.payload }
-            : site
-        ));
+        refreshSites();
       }
     });
 
     return () => {
       unsubscribeSiteUpdate();
     };
-  }, [subscribe]);
+  }, [subscribe, refreshSites]);
 
   useEffect(() => {
     // Apply filters
@@ -124,9 +60,9 @@ export function SitesPage() {
 
     if (searchTerm) {
       filtered = filtered.filter(site =>
-        site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        site.site_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         site.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        site.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
+        site.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -137,32 +73,79 @@ export function SitesPage() {
     setFilteredSites(filtered);
   }, [sites, searchTerm, statusFilter]);
 
-  const handleDeleteSite = (siteId: string) => {
+  const handleDeleteSite = async (siteId: string) => {
     if (window.confirm('Are you sure you want to delete this site? This action cannot be undone.')) {
-      setSites(prev => prev.filter(site => site.id !== siteId));
+      try {
+        await deleteSite(siteId);
+      } catch (error) {
+        console.error('Error deleting site:', error);
+      }
     }
   };
 
   const handleEditSite = (site: Site) => {
     setEditingSite(site);
-    setShowAddModal(true);
+    setShowForm(true);
+  };
+
+  const handleFormSubmit = async (data: SiteCreate | SiteUpdate) => {
+    setFormLoading(true);
+    try {
+      if (editingSite) {
+        await updateSite(editingSite.site_id, data as SiteUpdate);
+      } else {
+        await createSite(data as SiteCreate);
+      }
+      setShowForm(false);
+      setEditingSite(null);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingSite(null);
   };
 
   const getStatusCount = (status: string) => {
     return sites.filter(site => site.status === status).length;
   };
 
-  const getTotalWorkers = () => {
-    return sites.reduce((total, site) => total + site.workerCount, 0);
-  };
+  if (loading) {
+    return (
+      <div className="py-8 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary-600" />
+          <p className="text-gray-600">Loading sites...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const getTotalCameras = () => {
-    return sites.reduce((total, site) => total + site.cameraCount, 0);
-  };
-
-  const getTotalAlerts = () => {
-    return sites.reduce((total, site) => total + site.activeAlerts, 0);
-  };
+  if (error) {
+    return (
+      <div className="py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error loading sites</h3>
+              <p className="mt-1 text-sm text-red-700">{error}</p>
+              <button
+                onClick={refreshSites}
+                className="mt-2 text-sm text-red-800 hover:text-red-900 underline"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-8">
@@ -176,7 +159,7 @@ export function SitesPage() {
             </p>
           </div>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => setShowForm(true)}
             className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
@@ -194,8 +177,8 @@ export function SitesPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Total Sites</p>
-              <p className="text-2xl font-bold text-blue-600">{sites.length}</p>
-              <p className="text-xs text-gray-500">{getStatusCount('active')} active</p>
+              <p className="text-2xl font-bold text-blue-600">{stats?.total_sites || sites.length}</p>
+              <p className="text-xs text-gray-500">{stats?.active_sites || getStatusCount('active')} active</p>
             </div>
           </div>
         </div>
@@ -207,7 +190,7 @@ export function SitesPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Total Workers</p>
-              <p className="text-2xl font-bold text-green-600">{getTotalWorkers()}</p>
+              <p className="text-2xl font-bold text-green-600">{stats?.total_workers || 0}</p>
               <p className="text-xs text-gray-500">Across all sites</p>
             </div>
           </div>
@@ -220,7 +203,7 @@ export function SitesPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Total Cameras</p>
-              <p className="text-2xl font-bold text-yellow-600">{getTotalCameras()}</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats?.total_cameras || 0}</p>
               <p className="text-xs text-gray-500">Monitoring active</p>
             </div>
           </div>
@@ -233,7 +216,7 @@ export function SitesPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Active Alerts</p>
-              <p className="text-2xl font-bold text-red-600">{getTotalAlerts()}</p>
+              <p className="text-2xl font-bold text-red-600">{stats?.total_alerts || 0}</p>
               <p className="text-xs text-gray-500">Requiring attention</p>
             </div>
           </div>
@@ -329,10 +312,10 @@ export function SitesPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredSites.map((site) => (
-                <tr key={site.id} className="hover:bg-gray-50">
+                <tr key={site.site_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{site.name}</div>
+                      <div className="text-sm font-medium text-gray-900">{site.site_name}</div>
                       <div className="text-sm text-gray-500 flex items-center">
                         <MapPin className="h-3 w-3 mr-1" />
                         {site.location}
@@ -341,12 +324,12 @@ export function SitesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{site.contactPerson}</div>
+                      <div className="text-sm font-medium text-gray-900">{site.contact_person}</div>
                       <div className="text-sm text-gray-500 flex items-center">
                         <Phone className="h-3 w-3 mr-1" />
-                        {site.contactPhone}
+                        {site.contact_phone || 'N/A'}
                       </div>
-                      <div className="text-sm text-gray-500">{site.contactEmail}</div>
+                      <div className="text-sm text-gray-500">{site.contact_email || 'N/A'}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -359,17 +342,17 @@ export function SitesPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {site.cameraCount}
+                    {site.camera_count}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {site.workerCount}
+                    {site.worker_count}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={cn(
                       'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                      site.activeAlerts > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      site.active_alerts > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                     )}>
-                      {site.activeAlerts}
+                      {site.active_alerts}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -381,7 +364,7 @@ export function SitesPage() {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteSite(site.id)}
+                        onClick={() => handleDeleteSite(site.site_id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -419,40 +402,14 @@ export function SitesPage() {
         </div>
       </div>
 
-      {/* Add/Edit Modal Placeholder */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              {editingSite ? 'Edit Site' : 'Add New Site'}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {editingSite 
-                ? 'Update site information below.' 
-                : 'Fill in the details to create a new construction site.'
-              }
-            </p>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  // In a real app, this would save the site
-                  setShowAddModal(false);
-                  setEditingSite(null);
-                }}
-                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-              >
-                {editingSite ? 'Update' : 'Create'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Site Form Modal */}
+      <SiteForm
+        site={editingSite}
+        isOpen={showForm}
+        onClose={handleCloseForm}
+        onSubmit={handleFormSubmit}
+        loading={formLoading}
+      />
     </div>
   );
 }

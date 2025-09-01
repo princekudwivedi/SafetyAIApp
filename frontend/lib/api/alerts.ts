@@ -104,6 +104,16 @@ export class AlertsApi {
     return response.data;
   }
 
+  // Search alerts by text query
+  async searchAlerts(query: string, limit: number = 10): Promise<Alert[]> {
+    const params = new URLSearchParams();
+    params.append('query', query);
+    params.append('limit', limit.toString());
+    
+    const response = await apiClient.get(`/api/v1/alerts/search?${params.toString()}`);
+    return response.data;
+  }
+
   // Get a specific alert by ID
   async getAlert(alertId: string): Promise<Alert> {
     const response = await apiClient.get(`/api/v1/alerts/${alertId}`);

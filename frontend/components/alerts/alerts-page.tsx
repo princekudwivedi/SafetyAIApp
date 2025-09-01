@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Filter, Search, Clock, MapPin, Camera, User, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAlerts } from '@/hooks/use-alerts';
@@ -50,6 +51,7 @@ const severityLabels = {
 
 export function AlertsPage() {
   const { subscribe, isConnected } = useWebSocket();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<AlertType | null>(null);
@@ -80,6 +82,19 @@ export function AlertsPage() {
     // Loading states
     isLoadingUniqueValues,
   } = useAlerts();
+
+  // Handle alert parameter from URL
+  useEffect(() => {
+    const alertIdFromUrl = searchParams.get('alert');
+    if (alertIdFromUrl && paginatedAlerts.length > 0) {
+      const alertFromUrl = paginatedAlerts.find(alert => alert._id === alertIdFromUrl);
+      if (alertFromUrl) {
+        setSelectedAlert(alertFromUrl);
+        setIsModalOpen(true);
+        console.log('Alert from URL opened:', alertFromUrl.violation_type);
+      }
+    }
+  }, [searchParams, paginatedAlerts]);
 
   // Apply search filter to paginated alerts
   const searchFilteredAlerts = paginatedAlerts.filter(alert =>

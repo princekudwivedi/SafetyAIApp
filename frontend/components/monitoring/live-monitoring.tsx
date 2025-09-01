@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
+import { useSearchParams } from 'next/navigation';
 import { Camera, Play, Pause, Square, Settings, AlertTriangle, Wifi, WifiOff, Download, Clock, HardDrive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { monitoringApi, CameraMonitoringStatus, RecordingInfo } from '@/lib/api/monitoring';
@@ -9,6 +10,7 @@ import { VideoUploadManager } from './video-upload-manager';
 
 export function LiveMonitoring() {
   const { subscribe, isConnected } = useWebSocket();
+  const searchParams = useSearchParams();
   const [selectedCamera, setSelectedCamera] = useState<CameraMonitoringStatus | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -40,18 +42,44 @@ export function LiveMonitoring() {
       const camerasDataPromise = monitoringApi.getCamerasMonitoringStatus();
       const camerasData = await Promise.race([camerasDataPromise, timeoutPromise]) as CameraMonitoringStatus[];
       
-      console.log('Cameras data loaded:', camerasData.length, 'cameras'); // Debug log
-      setCameras(camerasData);
-      
-      // Update streaming and recording status for selected camera
-      if (selectedCamera) {
-        const updatedCamera = camerasData.find((cam: CameraMonitoringStatus) => cam.camera_id === selectedCamera.camera_id);
-        if (updatedCamera) {
-          setSelectedCamera(updatedCamera);
-          setIsStreaming(updatedCamera.is_streaming);
-          setIsRecording(updatedCamera.is_recording);
-        }
-      }
+             console.log('Cameras data loaded:', camerasData.length, 'cameras'); // Debug log
+       setCameras(camerasData);
+       
+       // Check if there's a camera parameter in the URL
+       const cameraIdFromUrl = searchParams.get('camera');
+       
+       if (cameraIdFromUrl && camerasData.length > 0) {
+         // Find the camera from URL parameter
+         const cameraFromUrl = camerasData.find((cam: CameraMonitoringStatus) => cam.camera_id === cameraIdFromUrl);
+         if (cameraFromUrl) {
+           setSelectedCamera(cameraFromUrl);
+           setIsStreaming(cameraFromUrl.is_streaming);
+           setIsRecording(cameraFromUrl.is_recording);
+           console.log('Camera from URL selected:', cameraFromUrl.name);
+         } else {
+           // If camera from URL not found, fall back to first camera
+           const firstCamera = camerasData[0];
+           setSelectedCamera(firstCamera);
+           setIsStreaming(firstCamera.is_streaming);
+           setIsRecording(firstCamera.is_recording);
+           console.log('Camera from URL not found, first camera auto-selected:', firstCamera.name);
+         }
+       } else if (camerasData.length > 0 && !selectedCamera) {
+         // Set first camera as default selected if no camera is currently selected
+         const firstCamera = camerasData[0];
+         setSelectedCamera(firstCamera);
+         setIsStreaming(firstCamera.is_streaming);
+         setIsRecording(firstCamera.is_recording);
+         console.log('First camera auto-selected:', firstCamera.name);
+       } else if (selectedCamera) {
+         // Update streaming and recording status for currently selected camera
+         const updatedCamera = camerasData.find((cam: CameraMonitoringStatus) => cam.camera_id === selectedCamera.camera_id);
+         if (updatedCamera) {
+           setSelectedCamera(updatedCamera);
+           setIsStreaming(updatedCamera.is_streaming);
+           setIsRecording(updatedCamera.is_recording);
+         }
+       }
     } catch (error) {
       console.error('Failed to load cameras data:', error);
       setHasError(true);

@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Vercel deployment configuration
+  // No additional config needed - Vercel handles Next.js automatically
   // experimental: {
   //   appDir: true,
   // },

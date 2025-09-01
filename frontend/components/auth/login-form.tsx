@@ -161,6 +161,7 @@ export function LoginForm() {
                 <Eye className="h-5 w-5 text-gray-400" />
               )}
             </button>
+            
           </div>
           {errors.password && (
             <p className="form-error">{errors.password.message}</p>
@@ -182,7 +183,7 @@ export function LoginForm() {
           </div>
         </div>
 
-        
+      
 
         {rememberMe && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">

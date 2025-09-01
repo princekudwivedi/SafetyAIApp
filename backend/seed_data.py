@@ -92,7 +92,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_001",
         "site_id": "SITE_001",
         "camera_name": "Main Entrance Camera",
-        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
+        "stream_url": "rtsp://192.168.1.101:554/stream1",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=90),
         "settings": {
@@ -108,7 +108,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_002",
         "site_id": "SITE_001",
         "camera_name": "Construction Zone A",
-        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
+        "stream_url": "rtsp://192.168.1.102:554/stream1",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=75),
         "settings": {
@@ -124,7 +124,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_003",
         "site_id": "SITE_001",
         "camera_name": "Construction Zone B",
-        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
+        "stream_url": "rtsp://192.168.1.103:554/stream1",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=60),
         "settings": {
@@ -140,7 +140,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_004",
         "site_id": "SITE_002",
         "camera_name": "Bridge Foundation",
-        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
+        "stream_url": "rtsp://192.168.2.101:554/stream1",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=45),
         "settings": {
@@ -156,7 +156,7 @@ CAMERAS_DATA = [
         "camera_id": "CAM_005",
         "site_id": "SITE_003",
         "camera_name": "Mall Entrance",
-        "stream_url": "rtsp://rtsp-test-server.viomic.com:554/stream",
+        "stream_url": "rtsp://192.168.3.101:554/stream1",
         "status": "Active",
         "installation_date": datetime.now(timezone.utc) - timedelta(days=30),
         "settings": {
@@ -174,42 +174,58 @@ USERS_DATA = [
     {
         "username": "admin",
         "email": "admin@safetyai.com",
-        "full_name": "System Administrator",
+        "first_name": "System",
+        "last_name": "Administrator",
         "role": "Administrator",
         "password_hash": hash_password("admin123"),
         "is_active": True,
         "permissions": ["read", "write", "delete", "admin"],
-        "site_id": None  # Admin can access all sites
+        "site_id": None,  # Admin can access all sites
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "last_login": None
     },
     {
         "username": "supervisor",
         "email": "supervisor@safetyai.com",
-        "full_name": "Site Supervisor",
+        "first_name": "Site",
+        "last_name": "Supervisor",
         "role": "Supervisor",
         "password_hash": hash_password("supervisor123"),
         "is_active": True,
         "permissions": ["read", "write"],
-        "site_id": "SITE_001"
+        "site_id": "SITE_001",
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "last_login": None
     },
     {
         "username": "safety_officer",
         "email": "safety@safetyai.com",
-        "full_name": "Safety Officer",
+        "first_name": "Safety",
+        "last_name": "Officer",
         "role": "SafetyOfficer",
         "password_hash": hash_password("safety123"),
         "is_active": True,
         "permissions": ["read", "write"],
-        "site_id": "SITE_001"
+        "site_id": "SITE_001",
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "last_login": None
     },
     {
         "username": "operator",
         "email": "operator@safetyai.com",
-        "full_name": "System Operator",
+        "first_name": "System",
+        "last_name": "Operator",
         "role": "Operator",
         "password_hash": hash_password("operator123"),
         "is_active": True,
         "permissions": ["read"],
-        "site_id": "SITE_002"
+        "site_id": "SITE_002",
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "last_login": None
     }
 ]
 
@@ -588,7 +604,7 @@ async def seed_database():
         print(f"\n🔐 Login Credentials for Testing:")
         print(f"- Admin: admin / admin123")
         print(f"- Supervisor: supervisor / supervisor123")
-        print(f"- Safety Officer: safety / safety123")
+        print(f"- Safety Officer: safety_officer / safety123")
         print(f"- Operator: operator / operator123")
         
     except Exception as e:

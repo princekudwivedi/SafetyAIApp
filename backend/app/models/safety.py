@@ -93,6 +93,10 @@ class Site(BaseDBModel):
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     is_active: bool = True
+    status: str = "active"  # active, inactive, maintenance
+    camera_count: int = 0
+    worker_count: int = 0
+    active_alerts: int = 0
 
 class SiteCreate(BaseModel):
     site_name: str
@@ -100,6 +104,8 @@ class SiteCreate(BaseModel):
     contact_person: str
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
+    status: Optional[str] = "active"
+    worker_count: Optional[int] = 0
 
 class SiteUpdate(BaseModel):
     site_name: Optional[str] = None
@@ -108,6 +114,8 @@ class SiteUpdate(BaseModel):
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     is_active: Optional[bool] = None
+    status: Optional[str] = None
+    worker_count: Optional[int] = None
 
 class Camera(BaseModel):
     camera_id: str = Field(..., unique=True)

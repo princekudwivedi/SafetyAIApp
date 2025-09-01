@@ -9,11 +9,51 @@ from app.models.base import PyObjectId
 
 router = APIRouter()
 
+@router.get("/search", response_model=List[Site])
+async def search_sites(
+    query: str = Query(..., description="Search query string"),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Search sites by text query across multiple fields"""
+    try:
+        database = get_database()
+        
+        # Create a case-insensitive regex pattern for the search query
+        regex_pattern = f".*{query}.*"
+        
+        # Build search query across multiple fields
+        search_query = {
+            "$or": [
+                {"site_name": {"$regex": regex_pattern, "$options": "i"}},
+                {"site_id": {"$regex": regex_pattern, "$options": "i"}},
+                {"location": {"$regex": regex_pattern, "$options": "i"}},
+                {"contact_person": {"$regex": regex_pattern, "$options": "i"}},
+                {"contact_email": {"$regex": regex_pattern, "$options": "i"}}
+            ]
+        }
+        
+        # Query database
+        cursor = database.sites.find(search_query).limit(limit)
+        sites = []
+        
+        async for site_doc in cursor:
+            sites.append(Site(**site_doc))
+        
+        return sites
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error searching sites: {str(e)}"
+        )
+
 @router.get("/", response_model=List[Site])
 async def get_sites(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     is_active: Optional[bool] = Query(None),
+    status: Optional[str] = Query(None),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get sites with filtering options."""
@@ -24,12 +64,22 @@ async def get_sites(
         filter_query = {}
         if is_active is not None:
             filter_query["is_active"] = is_active
+        if status is not None:
+            filter_query["status"] = status
         
         # Query database
         cursor = database.sites.find(filter_query).skip(skip).limit(limit)
         sites = []
         
         async for site_doc in cursor:
+            # Calculate camera count and active alerts for each site
+            camera_count = await database.cameras.count_documents({"site_id": site_doc["site_id"], "status": "Active"})
+            active_alerts = await database.alerts.count_documents({"location_id": site_doc["site_id"], "status": "New"})
+            
+            # Update site document with calculated values
+            site_doc["camera_count"] = camera_count
+            site_doc["active_alerts"] = active_alerts
+            
             sites.append(Site(**site_doc))
         
         return sites
@@ -95,6 +145,10 @@ async def create_site(
             "contact_email": site_data.contact_email,
             "contact_phone": site_data.contact_phone,
             "is_active": True,
+            "status": site_data.status or "active",
+            "camera_count": 0,
+            "worker_count": site_data.worker_count or 0,
+            "active_alerts": 0,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -157,6 +211,10 @@ async def update_site(
             update_fields["contact_phone"] = update_data.contact_phone
         if update_data.is_active is not None:
             update_fields["is_active"] = update_data.is_active
+        if update_data.status is not None:
+            update_fields["status"] = update_data.status
+        if update_data.worker_count is not None:
+            update_fields["worker_count"] = update_data.worker_count
         
         update_fields["updated_at"] = datetime.utcnow()
         

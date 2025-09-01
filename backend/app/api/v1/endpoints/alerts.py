@@ -36,6 +36,52 @@ def reverse_format_enum_value(value: str) -> str:
     # For other values, use the simple pattern
     return value.replace('_', ' ').title()
 
+@router.get("/search", response_model=List[Dict[str, Any]])
+async def search_alerts(
+    query: str = Query(..., description="Search query string"),
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Search alerts by text query across multiple fields"""
+    try:
+        # Create a case-insensitive regex pattern for the search query
+        regex_pattern = f".*{query}.*"
+        
+        # Build search query across multiple fields
+        search_query = {
+            "$or": [
+                {"violation_type": {"$regex": regex_pattern, "$options": "i"}},
+                {"description": {"$regex": regex_pattern, "$options": "i"}},
+                {"camera_id": {"$regex": regex_pattern, "$options": "i"}},
+                {"location_id": {"$regex": regex_pattern, "$options": "i"}},
+                {"status": {"$regex": regex_pattern, "$options": "i"}},
+                {"severity_level": {"$regex": regex_pattern, "$options": "i"}}
+            ]
+        }
+        
+        # Get alerts from database with search query
+        cursor = db.alerts.find(search_query).sort("timestamp", -1).limit(limit)
+        alerts = await cursor.to_list(length=limit)
+        
+        # Convert ObjectId to string and format enum values for JSON serialization
+        for alert in alerts:
+            if "_id" in alert:
+                alert["_id"] = str(alert["_id"])
+            if "timestamp" in alert:
+                alert["timestamp"] = alert["timestamp"].isoformat()
+            if "status" in alert:
+                alert["status"] = format_enum_value(alert["status"])
+            if "severity_level" in alert:
+                alert["severity_level"] = format_enum_value(alert["severity_level"])
+            if "violation_type" in alert:
+                alert["violation_type"] = format_enum_value(alert["violation_type"])
+        
+        return alerts
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error searching alerts: {str(e)}")
+
 @router.get("/", response_model=List[Dict[str, Any]])
 async def get_alerts(
     skip: int = Query(0, ge=0),

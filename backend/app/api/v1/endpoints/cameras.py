@@ -9,6 +9,45 @@ from app.models.base import PyObjectId
 
 router = APIRouter()
 
+@router.get("/search", response_model=List[Camera])
+async def search_cameras(
+    query: str = Query(..., description="Search query string"),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Search cameras by text query across multiple fields"""
+    try:
+        database = get_database()
+        
+        # Create a case-insensitive regex pattern for the search query
+        regex_pattern = f".*{query}.*"
+        
+        # Build search query across multiple fields
+        search_query = {
+            "$or": [
+                {"camera_name": {"$regex": regex_pattern, "$options": "i"}},
+                {"camera_id": {"$regex": regex_pattern, "$options": "i"}},
+                {"site_id": {"$regex": regex_pattern, "$options": "i"}},
+                {"location_description": {"$regex": regex_pattern, "$options": "i"}},
+                {"status": {"$regex": regex_pattern, "$options": "i"}}
+            ]
+        }
+        
+        # Query database
+        cursor = database.cameras.find(search_query).limit(limit)
+        cameras = []
+        
+        async for camera_doc in cursor:
+            cameras.append(Camera(**camera_doc))
+        
+        return cameras
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error searching cameras: {str(e)}"
+        )
+
 @router.get("/", response_model=List[Camera])
 async def get_cameras(
     skip: int = Query(0, ge=0),

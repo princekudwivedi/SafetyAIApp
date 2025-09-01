@@ -39,5 +39,5 @@ ENV APP_ENV=production \
 ENV PORT=8000
 EXPOSE 8000
 
-# Start FastAPI app via uvicorn
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start FastAPI app via uvicorn using Railway's PORT
+CMD ["sh", "-c", "python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

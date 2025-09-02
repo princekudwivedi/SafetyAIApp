@@ -153,7 +153,7 @@ async def root():
     return {
         "message": "Welcome to Construction Site Safety AI",
         "version": "1.0.0",
-        "status": "running"
+        "status": "ok"
     }
 
 @app.get("/health")

@@ -156,6 +156,10 @@ async def root():
         "status": "running"
     }
 
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",

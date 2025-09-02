@@ -1,16 +1,32 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-opencv-python-headless==4.8.1.78
-ultralytics==8.0.196
-pymongo==4.6.0
-python-multipart==0.0.6
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+
+# DB
+pymongo==4.6.3
+motor==3.4.0
+
+# Auth & uploads
+python-multipart==0.0.9
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+
+# Realtime & env
 websockets==12.0
-python-dotenv==1.0.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-python-dateutil==2.8.2
-Pillow==10.1.0
-numpy==1.24.3
-pandas==2.1.4
+python-dotenv==1.0.1
+
+# Pydantic v2 stack
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# Utilities
+python-dateutil==2.9.0.post0
+Pillow==10.3.0
+
+# Data / CV (with wheels on 3.11)
+numpy==1.26.4
+pandas==2.2.2
+opencv-python-headless==4.9.0.80
+
+# Ultralytics (CPU ok; pulls torch wheels from PyPI)
+ultralytics==8.2.103
+

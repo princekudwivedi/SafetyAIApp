@@ -13,6 +13,9 @@ from pathlib import Path
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
+# Ensure we're in the right directory
+os.chdir(backend_dir)
+
 def setup_environment():
     """Setup environment variables and logging"""
     # Set default environment variables if not set

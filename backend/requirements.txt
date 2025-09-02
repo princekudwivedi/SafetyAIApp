@@ -17,6 +17,7 @@ python-dotenv==1.0.1
 # Pydantic v2 stack
 pydantic==2.7.1
 pydantic-settings==2.2.1
+email-validator==2.1.1
 
 # Utilities
 python-dateutil==2.9.0.post0

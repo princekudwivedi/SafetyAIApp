@@ -1,43 +1,46 @@
-# syntax=docker/dockerfile:1
+# Use Python 3.11 slim image
+FROM python:3.11-slim
 
-FROM python:3.11-slim AS base
+# Set working directory
+WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# System deps (OpenCV, Ultralytics runtime, ffmpeg, build tools)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    ffmpeg \
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
     libglib2.0-0 \
     libsm6 \
     libxrender1 \
     libxext6 \
-    git \
-  && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
+    libfontconfig1 \
+    libx11-6 \
+    libgl1-mesa-glx \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
+COPY requirements.txt .
 
-# Copy backend app
-COPY . /app
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Ensure uploads/logs exist
-RUN mkdir -p /app/logs /app/uploads /app/alerts
+# Copy the application code
+COPY . .
 
-# Default environment
-ENV APP_ENV=production \
-    API_BASE_URL=https://api.safetyai.com \
-    YOLO_MODEL_PATH=yolov8n.pt
+# Create necessary directories
+RUN mkdir -p logs uploads alerts
 
-# Expose Railway port
-ENV PORT=8000
+# Expose port
 EXPOSE 8000
 
-# Start FastAPI app via uvicorn using Railway's PORT
-CMD ["sh", "-c", "python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
+
+# Run the application
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

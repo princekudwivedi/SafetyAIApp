@@ -47,10 +47,10 @@ def debug_environment():
         import cv2
         safe_print(f"✅ OpenCV version: {cv2.__version__}")
         
-        # Try to use OpenCV
+        # Try to use OpenCV with proper array shape
         import numpy as np
-        test_array = np.array([1, 2, 3])
-        result = cv2.cvtColor(test_array.reshape(1, 3, 1), cv2.COLOR_GRAY2BGR)
+        test_array = np.array([[1, 2, 3]], dtype=np.uint8)
+        result = cv2.cvtColor(test_array, cv2.COLOR_GRAY2BGR)
         safe_print("✅ OpenCV basic functionality works")
         
     except ImportError as e:

@@ -22,6 +22,11 @@ def test_imports():
     try:
         import cv2
         print(f"OpenCV: {cv2.__version__}")
+        # Test basic functionality
+        import numpy as np
+        test_array = np.array([[1, 2, 3]], dtype=np.uint8)
+        result = cv2.cvtColor(test_array, cv2.COLOR_GRAY2BGR)
+        print("OpenCV functionality: OK")
     except Exception as e:
         print(f"OpenCV error: {e}")
         return False

@@ -64,8 +64,8 @@ def check_imports_robust():
         
         # Test basic OpenCV functionality
         import numpy as np
-        test_array = np.array([1, 2, 3])
-        result = cv2.cvtColor(test_array.reshape(1, 3, 1), cv2.COLOR_GRAY2BGR)
+        test_array = np.array([[1, 2, 3]], dtype=np.uint8)
+        result = cv2.cvtColor(test_array, cv2.COLOR_GRAY2BGR)
         print("✅ OpenCV basic functionality works")
         
     except ImportError as e:

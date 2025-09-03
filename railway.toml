@@ -1,0 +1,46 @@
+# railway.toml
+
+[build]
+builder = "NIXPACKS"
+
+[build.env]
+NIXPACKS_PYTHON_VERSION = "3.11"
+PIP_DISABLE_PIP_VERSION_CHECK = "1"
+PIP_NO_CACHE_DIR = "1"
+
+[build.nixpacksPlan]
+providers = ["python"]
+
+# Ensure pip exists in the image
+[build.nixpacksPlan.phases.setup]
+# Add pip explicitly so Nixpacks' python has it available
+nixPkgs = ["python311Packages.pip"]
+
+[build.nixpacksPlan.phases.install]
+cmds = [
+  # Make sure pip is bootstrapped even if missing
+  "python3 -m ensurepip --upgrade || true",
+  "python3 -m pip install --upgrade pip setuptools wheel",
+
+  # Install everything EXCEPT torch/torchvision first
+  "grep -v -E '^(torch|torchvision)==.*' requirements.txt > requirements.notorch.txt || cp requirements.txt requirements.notorch.txt",
+  "python3 -m pip install -r requirements.notorch.txt",
+
+  # CPU-only PyTorch wheels (much smaller than CUDA)
+  "python3 -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
+
+  # Optional: trim heavy extras Ultralytics may pull if you don't need them
+  "python3 -m pip uninstall -y onnxruntime || true",
+  "python3 -m pip uninstall -y matplotlib || true",
+  "python3 -m pip uninstall -y seaborn || true",
+  "python3 -m pip uninstall -y thop || true",
+
+  # Shrink image further
+  "python3 -m pip cache purge || true"
+]
+
+[deploy]
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ALWAYS"

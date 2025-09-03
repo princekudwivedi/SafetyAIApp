@@ -1,4 +1,4 @@
-# railway.toml  (repo root)
+# railway.toml
 
 [build]
 builder = "NIXPACKS"
@@ -12,38 +12,37 @@ PIP_ROOT_USER_ACTION = "ignore"
 [build.nixpacksPlan]
 providers = ["python"]
 
-# Ensure Python + pip exist before running install commands
+# Ensure Python + pip are present
 [build.nixpacksPlan.phases.setup]
-# Add python311 and pip explicitly (plus curl if you ever need it)
 nixPkgs = ["python311", "python311Packages.pip"]
 
 [build.nixpacksPlan.phases.install]
 cmds = [
-  # Sanity
-  "python3 -V && pip3 -V || true",
+  # sanity
+  "python3 -V || true",
+  "pip3 -V || true",
 
-  # Upgrade packaging tools
-  "python3 -m pip install --upgrade pip setuptools wheel",
+  # upgrade packaging tools
+  "pip3 install --upgrade pip setuptools wheel",
 
-  # Install everything EXCEPT torch/torchvision/ultralytics first
+  # install everything EXCEPT torch/torchvision/ultralytics first
   "grep -v -E '^(torch|torchvision|ultralytics)==.*' requirements.txt > requirements.base.txt || cp requirements.txt requirements.base.txt",
-  "python3 -m pip install -r requirements.base.txt",
+  "pip3 install -r requirements.base.txt",
 
-  # CPU-only PyTorch wheels (keeps image small)
-  "python3 -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
+  # CPU-only PyTorch wheels (small)
+  "pip3 install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
 
-  # Now ultralytics (reuses CPU torch)
-  "python3 -m pip install ultralytics==8.2.103",
+  # Ultralytics (reuses CPU torch)
+  "pip3 install ultralytics==8.2.103",
 
-  # Trim bulky extras you likely don't need in prod
-  "python3 -m pip uninstall -y onnxruntime matplotlib seaborn thop || true",
+  # optional trims
+  "pip3 uninstall -y onnxruntime matplotlib seaborn thop || true",
 
-  # Shrink layer
-  "python3 -m pip cache purge || true"
+  # shrink image
+  "pip3 cache purge || true"
 ]
 
 [deploy]
-# Adjust if your ASGI app path differs
 startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300

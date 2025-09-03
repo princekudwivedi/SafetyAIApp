@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from app.core.config import settings
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -37,27 +38,98 @@ async def connect_to_mongo():
         
         # If using MongoDB Atlas (mongodb+srv://), add SSL parameters
         if mongodb_url.startswith("mongodb+srv://"):
-            connection_kwargs.update({
-                "tls": True,
-                "tlsAllowInvalidCertificates": True,
-                "tlsAllowInvalidHostnames": True,
+            # Check if we should use alternative connection method
+            use_alternative_ssl = os.getenv("USE_ALTERNATIVE_SSL", "false").lower() == "true"
+            
+            if use_alternative_ssl:
+                logger.info("Using alternative SSL configuration for deployment")
+                connection_kwargs.update({
+                    "ssl": True,
+                    "ssl_cert_reqs": None,
+                    "ssl_match_hostname": False,
+                    "retryWrites": True,
+                    "w": "majority",
+                    "serverSelectionTimeoutMS": 30000,
+                    "connectTimeoutMS": 30000,
+                    "socketTimeoutMS": 30000,
+                    "maxPoolSize": 5,
+                    "minPoolSize": 1
+                })
+            else:
+                # Standard configuration
+                connection_kwargs.update({
+                    "tls": True,
+                    "tlsAllowInvalidCertificates": True,
+                    "tlsAllowInvalidHostnames": True,
+                    "retryWrites": True,
+                    "w": "majority",
+                    "serverSelectionTimeoutMS": 60000,
+                    "connectTimeoutMS": 60000,
+                    "socketTimeoutMS": 60000,
+                    "maxPoolSize": 10,
+                    "minPoolSize": 1,
+                    "maxIdleTimeMS": 30000,
+                    "heartbeatFrequencyMS": 10000
+                })
+        
+        # Try multiple connection configurations for deployment compatibility
+        connection_attempts = [
+            # Attempt 1: Standard configuration
+            connection_kwargs,
+            # Attempt 2: More aggressive SSL bypass
+            {
+                "ssl": True,
+                "ssl_cert_reqs": None,
+                "ssl_match_hostname": False,
                 "retryWrites": True,
                 "w": "majority",
-                "serverSelectionTimeoutMS": 60000,  # Increased timeout
-                "connectTimeoutMS": 60000,  # Increased timeout
-                "socketTimeoutMS": 60000,  # Increased timeout
-                "maxPoolSize": 10,
-                "minPoolSize": 1,
-                "maxIdleTimeMS": 30000,
-                "heartbeatFrequencyMS": 10000
-            })
+                "serverSelectionTimeoutMS": 30000,
+                "connectTimeoutMS": 30000,
+                "socketTimeoutMS": 30000
+            },
+            # Attempt 3: Minimal SSL
+            {
+                "ssl": True,
+                "retryWrites": True,
+                "w": "majority",
+                "serverSelectionTimeoutMS": 20000,
+                "connectTimeoutMS": 20000,
+                "socketTimeoutMS": 20000
+            }
+        ]
         
-        db.client = AsyncIOMotorClient(mongodb_url, **connection_kwargs)
-        db.sync_client = MongoClient(mongodb_url, **connection_kwargs)
+        last_error = None
+        for i, config in enumerate(connection_attempts, 1):
+            try:
+                logger.info(f"Connection attempt {i}/{len(connection_attempts)} with config: {list(config.keys())}")
+                
+                db.client = AsyncIOMotorClient(mongodb_url, **config)
+                db.sync_client = MongoClient(mongodb_url, **config)
+                
+                # Test the connection
+                await db.client.admin.command('ping')
+                logger.info(f"Connected to MongoDB successfully with attempt {i}")
+                return  # Success, exit the function
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Connection attempt {i} failed: {str(e)[:100]}...")
+                
+                # Close any partial connections
+                try:
+                    if db.client:
+                        db.client.close()
+                    if db.sync_client:
+                        db.sync_client.close()
+                except:
+                    pass
+                
+                # Continue to next attempt
+                continue
         
-        # Test the connection
-        await db.client.admin.command('ping')
-        logger.info("Connected to MongoDB successfully.")
+        # If all attempts failed, raise the last error
+        logger.error(f"All connection attempts failed. Last error: {last_error}")
+        raise last_error
     except Exception as e:
         logger.error(f"Could not connect to MongoDB: {e}")
         raise e

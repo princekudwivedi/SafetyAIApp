@@ -1,0 +1,38 @@
+# Deployment-specific requirements with explicit NumPy 1.x constraint
+# This file ensures NumPy 1.x is used to prevent OpenCV compatibility issues
+
+torch==2.2.2
+torchvision==0.17.2
+
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+
+# DB
+pymongo==4.6.3
+motor==3.4.0
+
+# Auth & uploads
+python-multipart==0.0.9
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Realtime & env
+websockets==12.0
+python-dotenv==1.0.1
+
+# Pydantic v2 stack
+pydantic==2.7.1
+pydantic-settings==2.2.1
+email-validator==2.1.1
+
+# Utilities
+python-dateutil==2.9.0.post0
+Pillow==10.3.0
+
+# Data / CV - CRITICAL: Must use NumPy 1.x for OpenCV compatibility
+numpy==1.26.4
+pandas==2.2.2
+opencv-python-headless==4.9.0.80
+
+# Ultralytics (CPU ok; pulls torch wheels from PyPI)
+ultralytics==8.2.103

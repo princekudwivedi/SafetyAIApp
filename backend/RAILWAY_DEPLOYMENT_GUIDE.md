@@ -49,11 +49,6 @@ ALERTS_DIR=alerts
 #### Method 1: Nixpacks (Recommended)
 Railway will automatically detect and use the `nixpacks.toml` configuration.
 
-#### Method 2: Docker
-If Nixpacks fails, Railway can use the provided `Dockerfile`:
-1. Ensure Docker is enabled in Railway settings
-2. The `Dockerfile` will be used automatically
-
 ### 4. Health Check
 The application includes a health check endpoint at `/` that returns:
 ```json
@@ -105,7 +100,6 @@ backend/
 ├── requirements.txt       # Python dependencies
 ├── nixpacks.toml         # Nixpacks configuration
 ├── Procfile              # Process configuration
-├── Dockerfile            # Docker configuration
 ├── railway.toml          # Railway-specific settings
 └── app/                  # Application code
     ├── api/              # API endpoints

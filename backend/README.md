@@ -231,9 +231,6 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
 
 ### Docker Deployment
 
-```dockerfile
-FROM python:3.9-slim
-
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt

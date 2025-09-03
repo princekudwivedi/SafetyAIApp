@@ -1,0 +1,4 @@
+# Constraints file to prevent NumPy upgrades
+# This ensures NumPy 1.x is maintained throughout the installation process
+
+numpy==1.26.4

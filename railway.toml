@@ -12,40 +12,38 @@ PIP_ROOT_USER_ACTION = "ignore"
 [build.nixpacksPlan]
 providers = ["python"]
 
-# We need curl to bootstrap pip if it's missing
+# Ensure Python + pip exist before running install commands
 [build.nixpacksPlan.phases.setup]
-nixPkgs = ["curl"]
+# Add python311 and pip explicitly (plus curl if you ever need it)
+nixPkgs = ["python311", "python311Packages.pip"]
 
 [build.nixpacksPlan.phases.install]
 cmds = [
-  # 0) Sanity: show python version for logs
-  "python -V || true",
+  # Sanity
+  "python3 -V && pip3 -V || true",
 
-  # 1) Bootstrap pip if missing (ensurepip is disabled on Nix)
-  "command -v pip >/dev/null 2>&1 || (curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && python /tmp/get-pip.py && rm -f /tmp/get-pip.py)",
+  # Upgrade packaging tools
+  "python3 -m pip install --upgrade pip setuptools wheel",
 
-  # 2) Upgrade packaging tools
-  "pip install --upgrade pip setuptools wheel",
-
-  # 3) Install everything EXCEPT torch/torchvision/ultralytics first
+  # Install everything EXCEPT torch/torchvision/ultralytics first
   "grep -v -E '^(torch|torchvision|ultralytics)==.*' requirements.txt > requirements.base.txt || cp requirements.txt requirements.base.txt",
-  "pip install -r requirements.base.txt",
+  "python3 -m pip install -r requirements.base.txt",
 
-  # 4) Install CPU-only PyTorch wheels (keeps image small)
-  "pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
+  # CPU-only PyTorch wheels (keeps image small)
+  "python3 -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
 
-  # 5) Install ultralytics (will reuse CPU torch)
-  "pip install ultralytics==8.2.103",
+  # Now ultralytics (reuses CPU torch)
+  "python3 -m pip install ultralytics==8.2.103",
 
-  # 6) Trim heavy extras you likely don't need in prod
-  "pip uninstall -y onnxruntime matplotlib seaborn thop || true",
+  # Trim bulky extras you likely don't need in prod
+  "python3 -m pip uninstall -y onnxruntime matplotlib seaborn thop || true",
 
-  # 7) Shrink layer
-  "pip cache purge || true"
+  # Shrink layer
+  "python3 -m pip cache purge || true"
 ]
 
 [deploy]
-# Adjust if your app is elsewhere (e.g., app.main:app)
+# Adjust if your ASGI app path differs
 startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300

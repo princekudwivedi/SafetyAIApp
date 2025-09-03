@@ -14,9 +14,28 @@ db = Database()
 async def connect_to_mongo():
     """Create database connection."""
     try:
-        db.client = AsyncIOMotorClient(settings.MONGODB_URL)
-        db.sync_client = MongoClient(settings.MONGODB_URL)
-        logger.info("Connected to MongoDB.")
+        # Enhanced connection with SSL handling for MongoDB Atlas
+        connection_kwargs = {}
+        
+        # If using MongoDB Atlas (mongodb+srv://), add SSL parameters
+        if settings.MONGODB_URL.startswith("mongodb+srv://"):
+            connection_kwargs.update({
+                "tls": True,
+                "tlsAllowInvalidCertificates": True,
+                "tlsAllowInvalidHostnames": True,
+                "retryWrites": True,
+                "w": "majority",
+                "serverSelectionTimeoutMS": 30000,
+                "connectTimeoutMS": 30000,
+                "socketTimeoutMS": 30000
+            })
+        
+        db.client = AsyncIOMotorClient(settings.MONGODB_URL, **connection_kwargs)
+        db.sync_client = MongoClient(settings.MONGODB_URL, **connection_kwargs)
+        
+        # Test the connection
+        await db.client.admin.command('ping')
+        logger.info("Connected to MongoDB successfully.")
     except Exception as e:
         logger.error(f"Could not connect to MongoDB: {e}")
         raise e

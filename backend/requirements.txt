@@ -27,8 +27,8 @@ email-validator==2.1.1
 python-dateutil==2.9.0.post0
 Pillow==10.3.0
 
-# Data / CV (with wheels on 3.11)
-numpy==1.26.4
+# Data / CV (with wheels on 3.11) - Pinned to NumPy 1.x for OpenCV compatibility
+numpy>=1.24.0,<2.0.0
 pandas==2.2.2
 opencv-python-headless==4.9.0.80
 

@@ -29,6 +29,9 @@ email-validator==2.1.1
 python-dateutil==2.9.0.post0
 Pillow==10.3.0
 psutil==7.0.0
+matplotlib==3.10.6
+scipy==1.16.1
+seaborn==0.13.2
 
 # Data / CV - CRITICAL: Must use NumPy 1.x for OpenCV compatibility
 numpy==1.26.4
@@ -37,3 +40,5 @@ opencv-python-headless==4.9.0.80
 
 # Ultralytics (CPU ok; pulls torch wheels from PyPI)
 ultralytics==8.2.103
+pyyaml==6.0.2
+tqdm==4.67.1

@@ -1,5 +1,4 @@
-# /railway.toml (repo root)
-$schema = "https://railway.com/railway.schema.json"
+# railway.toml
 
 [build]
 builder = "NIXPACKS"
@@ -12,35 +11,29 @@ PIP_NO_CACHE_DIR = "1"
 [build.nixpacksPlan]
 providers = ["python"]
 
-# Uncomment ffmpeg only if you truly need video I/O
+# If you truly need ffmpeg for video I/O, uncomment:
 # [build.nixpacksPlan.phases.setup]
 # nixPkgs = ["ffmpeg"]
 
 [build.nixpacksPlan.phases.install]
 cmds = [
-  # Upgrade pip
   "python -m pip install --upgrade pip",
-
-  # Install everything EXCEPT torch/torchvision first
+  # Install everything EXCEPT torch/torchvision from requirements
   "grep -v -E '^(torch|torchvision)==.*' requirements.txt > requirements.notorch.txt || cp requirements.txt requirements.notorch.txt",
   "python -m pip install -r requirements.notorch.txt",
-
   # CPU-only PyTorch wheels (much smaller than CUDA)
   "python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
-
-  # Trim heavy extras Ultralytics may pull (remove lines you actually need)
+  # Strip heavy extras pulled by Ultralytics if you don't use them in prod
   "python -m pip uninstall -y onnxruntime || true",
   "python -m pip uninstall -y matplotlib || true",
   "python -m pip uninstall -y seaborn || true",
   "python -m pip uninstall -y thop || true",
-
-  # Shrink image
+  # Shrink image further
   "pip cache purge || true"
 ]
 
 [deploy]
-# Railway sets $PORT; your working dir is already /backend
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ALWAYS"

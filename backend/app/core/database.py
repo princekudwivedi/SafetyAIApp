@@ -38,9 +38,13 @@ async def connect_to_mongo():
                 "tlsAllowInvalidHostnames": True,
                 "retryWrites": True,
                 "w": "majority",
-                "serverSelectionTimeoutMS": 30000,
-                "connectTimeoutMS": 30000,
-                "socketTimeoutMS": 30000
+                "serverSelectionTimeoutMS": 60000,  # Increased timeout
+                "connectTimeoutMS": 60000,  # Increased timeout
+                "socketTimeoutMS": 60000,  # Increased timeout
+                "maxPoolSize": 10,
+                "minPoolSize": 1,
+                "maxIdleTimeMS": 30000,
+                "heartbeatFrequencyMS": 10000
             })
         
         db.client = AsyncIOMotorClient(mongodb_url, **connection_kwargs)
@@ -71,53 +75,77 @@ async def init_db():
     # Create collections if they don't exist
     database = db.client[settings.DATABASE_NAME]
     
-    # Create indexes for better performance
-    try:
-        # Users collection
-        await database.users.create_index("username", unique=True)
-        await database.users.create_index("email", unique=True)
-        
-        # Alerts collection
-        await database.alerts.create_index("timestamp")
-        await database.alerts.create_index("status")
-        await database.alerts.create_index("violation_type")
-        
-        # Cameras collection
-        await database.cameras.create_index("site_id")
-        await database.cameras.create_index("status")
-        
-        # Sites collection
-        await database.sites.create_index("site_name")
-        
-        # Reports collection
-        await database.reports.create_index("generated_at")
-        await database.reports.create_index("report_type")
-        await database.reports.create_index("generated_by")
-        
-        # Zones collection
-        await database.zones.create_index("site_id")
-        await database.zones.create_index("zone_type")
-        await database.zones.create_index("status")
-        
-        # Notifications collection
-        await database.notifications.create_index("recipient_id")
-        await database.notifications.create_index("status")
-        await database.notifications.create_index("created_at")
-        
-        # Audit logs collection
-        await database.audit_logs.create_index("timestamp")
-        await database.audit_logs.create_index("user_id")
-        await database.audit_logs.create_index("action")
-        await database.audit_logs.create_index("resource")
-        
-        # System events collection
-        await database.system_events.create_index("timestamp")
-        await database.system_events.create_index("event_type")
-        await database.system_events.create_index("severity")
-        
-        logger.info("Database initialized successfully.")
-    except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+    # Create indexes for better performance with retry logic
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Initializing database indexes (attempt {attempt + 1}/{max_retries})")
+            
+            # Users collection
+            await database.users.create_index("username", unique=True)
+            await database.users.create_index("email", unique=True)
+            
+            # Alerts collection
+            await database.alerts.create_index("timestamp")
+            await database.alerts.create_index("status")
+            await database.alerts.create_index("violation_type")
+            
+            # Cameras collection
+            await database.cameras.create_index("site_id")
+            await database.cameras.create_index("status")
+            
+            # Sites collection
+            await database.sites.create_index("site_name")
+            
+            # Reports collection
+            await database.reports.create_index("generated_at")
+            await database.reports.create_index("report_type")
+            await database.reports.create_index("generated_by")
+            
+            # Zones collection
+            await database.zones.create_index("site_id")
+            await database.zones.create_index("zone_type")
+            await database.zones.create_index("status")
+            
+            # Notifications collection
+            await database.notifications.create_index("recipient_id")
+            await database.notifications.create_index("status")
+            await database.notifications.create_index("created_at")
+            
+            # Audit logs collection
+            await database.audit_logs.create_index("timestamp")
+            await database.audit_logs.create_index("user_id")
+            await database.audit_logs.create_index("action")
+            await database.audit_logs.create_index("resource")
+            
+            # System events collection
+            await database.system_events.create_index("timestamp")
+            await database.system_events.create_index("event_type")
+            await database.system_events.create_index("severity")
+            
+            logger.info("Database initialized successfully.")
+            return  # Success, exit the retry loop
+            
+        except Exception as e:
+            logger.warning(f"Database initialization attempt {attempt + 1} failed: {e}")
+            
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                import asyncio
+                await asyncio.sleep(retry_delay)
+                
+                # Reconnect to MongoDB before retry
+                try:
+                    await connect_to_mongo()
+                    database = db.client[settings.DATABASE_NAME]
+                except Exception as reconnect_error:
+                    logger.error(f"Failed to reconnect to MongoDB: {reconnect_error}")
+            else:
+                logger.error(f"Database initialization failed after {max_retries} attempts: {e}")
+                # Don't raise the exception, just log it to allow the app to continue
+                logger.warning("Application will continue without database indexes. Some features may be slower.")
 
 def get_database():
     """Get database instance."""

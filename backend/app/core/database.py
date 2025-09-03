@@ -14,11 +14,24 @@ db = Database()
 async def connect_to_mongo():
     """Create database connection."""
     try:
+        # Clean the connection string to remove invalid parameters
+        mongodb_url = settings.MONGODB_URL
+        
+        # Remove invalid ssl_cert_reqs parameter if present
+        if "ssl_cert_reqs=" in mongodb_url:
+            import re
+            mongodb_url = re.sub(r'[?&]ssl_cert_reqs=[^&]*', '', mongodb_url)
+            # Clean up any double ? or & characters
+            mongodb_url = re.sub(r'\?&', '?', mongodb_url)
+            mongodb_url = re.sub(r'&&', '&', mongodb_url)
+            mongodb_url = mongodb_url.rstrip('?&')
+            logger.info("Cleaned MongoDB URL to remove invalid ssl_cert_reqs parameter")
+        
         # Enhanced connection with SSL handling for MongoDB Atlas
         connection_kwargs = {}
         
         # If using MongoDB Atlas (mongodb+srv://), add SSL parameters
-        if settings.MONGODB_URL.startswith("mongodb+srv://"):
+        if mongodb_url.startswith("mongodb+srv://"):
             connection_kwargs.update({
                 "tls": True,
                 "tlsAllowInvalidCertificates": True,
@@ -30,8 +43,8 @@ async def connect_to_mongo():
                 "socketTimeoutMS": 30000
             })
         
-        db.client = AsyncIOMotorClient(settings.MONGODB_URL, **connection_kwargs)
-        db.sync_client = MongoClient(settings.MONGODB_URL, **connection_kwargs)
+        db.client = AsyncIOMotorClient(mongodb_url, **connection_kwargs)
+        db.sync_client = MongoClient(mongodb_url, **connection_kwargs)
         
         # Test the connection
         await db.client.admin.command('ping')

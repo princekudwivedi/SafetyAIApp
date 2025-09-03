@@ -1,4 +1,4 @@
-# railway.toml
+# railway.toml  (place at repo root)
 
 [build]
 builder = "NIXPACKS"
@@ -18,32 +18,32 @@ nixPkgs = ["python311", "python311Packages.pip"]
 
 [build.nixpacksPlan.phases.install]
 cmds = [
-  # sanity
+  # 0) sanity
   "python3 -V || true",
   "pip3 -V || true",
 
-  # upgrade packaging tools
-  "pip3 install --upgrade pip setuptools wheel",
+  # 1) create an isolated, writable venv
+  "python3 -m venv /opt/venv",
 
-  # install everything EXCEPT torch/torchvision/ultralytics first
+  # 2) upgrade packaging tools INSIDE the venv
+  "/opt/venv/bin/python -m pip install --upgrade pip setuptools wheel",
+
+  # 3) install everything EXCEPT torch/torchvision/ultralytics first
   "grep -v -E '^(torch|torchvision|ultralytics)==.*' requirements.txt > requirements.base.txt || cp requirements.txt requirements.base.txt",
-  "pip3 install -r requirements.base.txt",
+  "/opt/venv/bin/pip install -r requirements.base.txt",
 
-  # CPU-only PyTorch wheels (small)
-  "pip3 install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
+  # 4) CPU-only PyTorch wheels (keeps image small)
+  "/opt/venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
 
-  # Ultralytics (reuses CPU torch)
-  "pip3 install ultralytics==8.2.103",
+  # 5) Now ultralytics (reuses CPU torch)
+  "/opt/venv/bin/pip install ultralytics==8.2.103",
 
-  # optional trims
-  "pip3 uninstall -y onnxruntime matplotlib seaborn thop || true",
+  # 6) optional trims if you don't need them in prod
+  "/opt/venv/bin/pip uninstall -y onnxruntime matplotlib seaborn thop || true",
 
-  # shrink image
-  "pip3 cache purge || true"
+  # 7) shrink image
+  "/opt/venv/bin/pip cache purge || true"
 ]
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
-healthcheckPath = "/health"
-healthcheckTimeout = 300
-restartPolicyType = "ALWAYS"
+# Use the venv's uvicorn so runtime sees venv pac

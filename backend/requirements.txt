@@ -7,6 +7,7 @@ uvicorn[standard]==0.29.0
 # DB
 pymongo==4.6.3
 motor==3.4.0
+dnspython==2.7.0
 
 # Auth & uploads
 python-multipart==0.0.9

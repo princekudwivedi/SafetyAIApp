@@ -14,8 +14,13 @@ db = Database()
 async def connect_to_mongo():
     """Create database connection."""
     try:
+        # Check if MONGODB_URL is set
+        if not settings.MONGODB_URL:
+            raise ValueError("MONGODB_URL environment variable is not set")
+        
         # Clean the connection string to remove invalid parameters
         mongodb_url = settings.MONGODB_URL
+        logger.info(f"Connecting to MongoDB with URL: {mongodb_url[:50]}...")
         
         # Remove invalid ssl_cert_reqs parameter if present
         if "ssl_cert_reqs=" in mongodb_url:
@@ -70,10 +75,33 @@ async def close_mongo_connection():
 
 async def init_db():
     """Initialize database connection and create collections."""
-    await connect_to_mongo()
-    
-    # Create collections if they don't exist
-    database = db.client[settings.DATABASE_NAME]
+    try:
+        logger.info("Starting database initialization...")
+        
+        # Check environment variables first
+        if not settings.MONGODB_URL:
+            error_msg = "MONGODB_URL environment variable is not set. Please set it in your deployment environment."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        if not settings.DATABASE_NAME:
+            error_msg = "DATABASE_NAME environment variable is not set. Please set it in your deployment environment."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        logger.info(f"Environment check passed - MONGODB_URL: {'SET' if settings.MONGODB_URL else 'NOT SET'}, DATABASE_NAME: {settings.DATABASE_NAME}")
+        
+        await connect_to_mongo()
+        logger.info("Database connection established successfully")
+        
+        # Create collections if they don't exist
+        database = db.client[settings.DATABASE_NAME]
+        logger.info(f"Using database: {settings.DATABASE_NAME}")
+    except Exception as e:
+        logger.error(f"Failed to establish database connection: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {str(e)}")
+        raise
     
     # Create indexes for better performance with retry logic
     max_retries = 3

@@ -13,7 +13,15 @@ from app.core.auth_middleware import add_global_auth_middleware
 async def lifespan(app: FastAPI):
     # Startup
     setup_logging()
-    await init_db()
+    try:
+        await init_db()
+        print("✅ Database initialization completed successfully")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        print("⚠️  Application will start without database connection")
+        print("   Some features may not work properly")
+        # Don't raise the exception - allow the app to start
+        # This is important for deployment environments where DB might not be immediately available
     yield
     # Shutdown
     pass

@@ -47,3 +47,6 @@ cmds = [
 
 [deploy]
 # Use the venv's uvicorn so runtime sees venv pac
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ALWAYS"

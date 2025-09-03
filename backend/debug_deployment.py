@@ -22,15 +22,31 @@ def debug_environment():
     print("=" * 50)
     
     # Check Python version
-    print(f"Python version: {sys.version}")
+    try:
+        print(f"Python version: {sys.version}")
+    except Exception as e:
+        print(f"Python version check failed: {e}")
+        print("Python version: Available but encoding issue")
     
     # Check pip list
     print("\n📦 Installed packages:")
-    returncode, stdout, stderr = run_command("pip list | grep -E '(numpy|opencv|torch)'")
-    if returncode == 0:
-        print(stdout)
-    else:
-        print("Could not get package list")
+    try:
+        returncode, stdout, stderr = run_command("pip list | grep -E '(numpy|opencv|torch)'")
+        if returncode == 0:
+            print(stdout)
+        else:
+            print("Could not get package list with grep, trying alternative...")
+            # Try alternative approach
+            returncode, stdout, stderr = run_command("pip list")
+            if returncode == 0:
+                lines = stdout.split('\n')
+                relevant_lines = [line for line in lines if any(keyword in line.lower() for keyword in ['numpy', 'opencv', 'torch'])]
+                for line in relevant_lines:
+                    print(line)
+            else:
+                print("Could not get package list")
+    except Exception as e:
+        print(f"Package list check failed: {e}")
     
     # Check NumPy installation
     print("\n🔍 NumPy Analysis:")

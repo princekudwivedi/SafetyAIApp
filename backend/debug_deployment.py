@@ -86,12 +86,22 @@ def debug_environment():
     # Check AI Engine
     print("\n🔍 AI Engine Analysis:")
     try:
+        # Clear any cached imports that might have NumPy 2.x
+        import sys
+        modules_to_clear = [mod for mod in sys.modules.keys() if 'numpy' in mod or 'cv2' in mod]
+        for mod in modules_to_clear:
+            if mod in sys.modules:
+                del sys.modules[mod]
+        
+        # Now try to import AI Engine
         from app.core.ai_engine import AIEngine
         print("✅ AI Engine import successful")
     except ImportError as e:
         print(f"❌ AI Engine import failed: {e}")
+        print("   This is expected if NumPy 2.x is still present")
     except Exception as e:
         print(f"❌ AI Engine error: {e}")
+        print("   This is expected if NumPy 2.x is still present")
 
 if __name__ == "__main__":
     debug_environment()

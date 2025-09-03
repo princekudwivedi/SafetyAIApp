@@ -24,6 +24,7 @@ cmds = [
   "/opt/venv/bin/pip install --upgrade pip setuptools wheel",
 
   # 2) Install NumPy 1.x FIRST to prevent any package from upgrading it
+  "/opt/venv/bin/pip uninstall -y numpy || true",
   "/opt/venv/bin/pip install --no-cache-dir --force-reinstall 'numpy==1.26.4'",
   
   # 2.5) Install everything EXCEPT torch/torchvision/ultralytics (with NumPy 1.x constraints)
@@ -36,6 +37,9 @@ cmds = [
   # 2.7) Debug and verify NumPy version after base installation
   "/opt/venv/bin/python -c \"import numpy; print('NumPy after base install:', numpy.__version__); assert numpy.__version__.startswith('1.'), f'NumPy {numpy.__version__} is not 1.x!'\"",
   "/opt/venv/bin/python -c \"import subprocess; result = subprocess.run(['pip', 'list'], capture_output=True, text=True); print('\\nInstalled packages:'); print(result.stdout)\"",
+  
+  # 2.8) If NumPy 2.x is detected, force remove it and reinstall 1.x
+  "/opt/venv/bin/python -c \"import numpy; exit(0 if numpy.__version__.startswith('1.') else 1)\" || (echo 'NumPy 2.x detected, forcing reinstall...' && /opt/venv/bin/pip uninstall -y numpy && /opt/venv/bin/pip install --no-cache-dir --force-reinstall 'numpy==1.26.4')",
 
   # 3) CPU-only Torch (with NumPy constraints)
   "/opt/venv/bin/pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu -c constraints.txt",
@@ -43,6 +47,9 @@ cmds = [
   # 3.5) Re-enforce NumPy 1.x after PyTorch (PyTorch might try to upgrade NumPy)
   "/opt/venv/bin/pip install --no-cache-dir --force-reinstall 'numpy==1.26.4'",
   "/opt/venv/bin/python -c \"import numpy; print('NumPy after PyTorch:', numpy.__version__); assert numpy.__version__.startswith('1.'), f'NumPy {numpy.__version__} is not 1.x!'\"",
+  
+  # 3.6) If NumPy 2.x is detected after PyTorch, force remove it and reinstall 1.x
+  "/opt/venv/bin/python -c \"import numpy; exit(0 if numpy.__version__.startswith('1.') else 1)\" || (echo 'NumPy 2.x detected after PyTorch, forcing reinstall...' && /opt/venv/bin/pip uninstall -y numpy && /opt/venv/bin/pip install --no-cache-dir --force-reinstall 'numpy==1.26.4')",
 
   # 4) Ultralytics WITHOUT deps (so it can't upgrade numpy)
   "/opt/venv/bin/pip install --no-cache-dir --no-deps ultralytics==8.2.103",
@@ -50,12 +57,16 @@ cmds = [
   # 5) Enforce headless OpenCV (avoid libGL GUI deps)
   "/opt/venv/bin/pip uninstall -y opencv-python opencv-contrib-python || true",
   "/opt/venv/bin/pip install --no-cache-dir --force-reinstall opencv-python-headless==4.9.0.80",
+  
+  # 5.5) Final NumPy enforcement before verification
+  "/opt/venv/bin/pip install --no-cache-dir --force-reinstall 'numpy==1.26.4'",
+  "/opt/venv/bin/python -c \"import numpy; print('Final NumPy version:', numpy.__version__); assert numpy.__version__.startswith('1.'), f'Final NumPy {numpy.__version__} is not 1.x!'\"",
 
   # 6) sanity checks
   "/opt/venv/bin/python debug_deployment.py",
   "/opt/venv/bin/python -c \"import numpy, cv2; print('NUMPY=', numpy.__version__, 'CV2=', cv2.__version__)\"",
   "/opt/venv/bin/python -c \"import numpy; assert numpy.__version__.startswith('1.'), f'NumPy version {numpy.__version__} is not 1.x - this will cause OpenCV issues'\"",
-  "/opt/venv/bin/python verify_deployment.py",
+  "/opt/venv/bin/python verify_deployment_robust.py",
   "/opt/venv/bin/pip check || true"
 ]
 

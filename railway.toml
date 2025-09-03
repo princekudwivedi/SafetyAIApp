@@ -1,4 +1,4 @@
-# railway.toml  (place at repo root)
+# railway.toml (repo root)
 
 [build]
 builder = "NIXPACKS"
@@ -12,41 +12,46 @@ PIP_ROOT_USER_ACTION = "ignore"
 [build.nixpacksPlan]
 providers = ["python"]
 
-# Ensure Python + pip are present
+# OS libs: Python, pip, libGL (mesa), glib, and ffmpeg if you read/write video
 [build.nixpacksPlan.phases.setup]
-nixPkgs = ["python311", "python311Packages.pip"]
+nixPkgs = ["python311", "python311Packages.pip", "mesa", "glib", "ffmpeg"]
 
 [build.nixpacksPlan.phases.install]
 cmds = [
-  # 0) sanity
+  # Create isolated, writable venv (avoids PEP 668)
   "python3 -V || true",
-  "pip3 -V || true",
-
-  # 1) create an isolated, writable venv
   "python3 -m venv /opt/venv",
 
-  # 2) upgrade packaging tools INSIDE the venv
-  "/opt/venv/bin/python -m pip install --upgrade pip setuptools wheel",
+  # Upgrade packaging tools INSIDE the venv
+  "/opt/venv/bin/pip install --upgrade pip setuptools wheel",
 
-  # 3) install everything EXCEPT torch/torchvision/ultralytics first
+  # Install everything EXCEPT torch/torchvision/ultralytics first
   "grep -v -E '^(torch|torchvision|ultralytics)==.*' requirements.txt > requirements.base.txt || cp requirements.txt requirements.base.txt",
   "/opt/venv/bin/pip install -r requirements.base.txt",
 
-  # 4) CPU-only PyTorch wheels (keeps image small)
+  # CPU-only PyTorch wheels (keeps image small)
   "/opt/venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
 
-  # 5) Now ultralytics (reuses CPU torch)
+  # Install Ultralytics
   "/opt/venv/bin/pip install ultralytics==8.2.103",
 
-  # 6) optional trims if you don't need them in prod
+  # ENFORCE HEADLESS OPENCV (prevent libGL errors)
+  "/opt/venv/bin/pip uninstall -y opencv-python opencv-contrib-python || true",
+  "/opt/venv/bin/pip install --upgrade --force-reinstall opencv-python-headless==4.9.0.80",
+
+  # Optional trims you likely don’t need on server
   "/opt/venv/bin/pip uninstall -y onnxruntime matplotlib seaborn thop || true",
 
-  # 7) shrink image
+  # Debug: confirm only headless is present
+  "/opt/venv/bin/python -c \"import pkgutil;import sys;mods=[m.name for m in pkgutil.iter_modules()];print('opencv-headless?', 'opencv-python-headless' in mods);\" || true",
+  "/opt/venv/bin/pip freeze | grep -i opencv || true",
+
+  # Shrink layer
   "/opt/venv/bin/pip cache purge || true"
 ]
 
 [deploy]
-# Use the venv's uvicorn so runtime sees venv pac
+# (If you use a Procfile in /backend, omit startCommand here.)
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ALWAYS"

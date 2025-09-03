@@ -16,7 +16,7 @@ passlib[bcrypt]==1.7.4
 # Realtime & env
 websockets==12.0
 python-dotenv==1.0.1
- 
+
 # Pydantic v2 stack
 pydantic==2.7.1
 pydantic-settings==2.2.1

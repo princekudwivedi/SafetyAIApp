@@ -14,40 +14,32 @@ providers = ["python"]
 
 # OS libs: Python, pip, libGL (mesa), glib, and ffmpeg if you read/write video
 [build.nixpacksPlan.phases.setup]
+# Python, pip, plus minimal libs (GL/video) needed by OpenCV headless
 nixPkgs = ["python311", "python311Packages.pip", "mesa", "glib", "ffmpeg"]
 
 [build.nixpacksPlan.phases.install]
 cmds = [
-  # Create isolated, writable venv (avoids PEP 668)
-  "python3 -V || true",
+  # 1) isolated venv
   "python3 -m venv /opt/venv",
-
-  # Upgrade packaging tools INSIDE the venv
   "/opt/venv/bin/pip install --upgrade pip setuptools wheel",
 
-  # Install everything EXCEPT torch/torchvision/ultralytics first
+  # 2) install everything EXCEPT torch/torchvision/ultralytics first (includes your numpy==1.26.4 pin)
   "grep -v -E '^(torch|torchvision|ultralytics)==.*' requirements.txt > requirements.base.txt || cp requirements.txt requirements.base.txt",
-  "/opt/venv/bin/pip install -r requirements.base.txt",
+  "/opt/venv/bin/pip install --no-cache-dir -r requirements.base.txt",
 
-  # CPU-only PyTorch wheels (keeps image small)
-  "/opt/venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
+  # 3) CPU-only Torch
+  "/opt/venv/bin/pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.2.2+cpu torchvision==0.17.2+cpu",
 
-  # Install Ultralytics
-  "/opt/venv/bin/pip install ultralytics==8.2.103",
+  # 4) Ultralytics WITHOUT deps (so it can't upgrade numpy)
+  "/opt/venv/bin/pip install --no-cache-dir --no-deps ultralytics==8.2.103",
 
-  # ENFORCE HEADLESS OPENCV (prevent libGL errors)
+  # 5) Enforce headless OpenCV (avoid libGL GUI deps)
   "/opt/venv/bin/pip uninstall -y opencv-python opencv-contrib-python || true",
-  "/opt/venv/bin/pip install --upgrade --force-reinstall opencv-python-headless==4.9.0.80",
+  "/opt/venv/bin/pip install --no-cache-dir --force-reinstall opencv-python-headless==4.9.0.80",
 
-  # Optional trims you likely don’t need on server
-  "/opt/venv/bin/pip uninstall -y onnxruntime matplotlib seaborn thop || true",
-
-  # Debug: confirm only headless is present
-  "/opt/venv/bin/python -c \"import pkgutil;import sys;mods=[m.name for m in pkgutil.iter_modules()];print('opencv-headless?', 'opencv-python-headless' in mods);\" || true",
-  "/opt/venv/bin/pip freeze | grep -i opencv || true",
-
-  # Shrink layer
-  "/opt/venv/bin/pip cache purge || true"
+  # 6) sanity checks
+  "/opt/venv/bin/python -c \"import numpy, cv2; print('NUMPY=', numpy.__version__, 'CV2=', cv2.__version__)\"",
+  "/opt/venv/bin/pip check || true"
 ]
 
 [deploy]

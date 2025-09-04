@@ -6,24 +6,27 @@ console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
 console.log('NEXT_PUBLIC_WS_URL:', process.env.NEXT_PUBLIC_WS_URL);
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
+// Set fallback values for missing environment variables
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+
 const nextConfig = {
   images: {
     domains: [
-      ...(process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.includes('://') 
-        ? [new URL(process.env.NEXT_PUBLIC_API_URL).hostname] 
-        : [])
+      ...(apiUrl && apiUrl.includes('://') 
+        ? [new URL(apiUrl).hostname] 
+        : ['localhost'])
     ],
     remotePatterns: [
       {
-        protocol: (process.env.NEXT_PUBLIC_API_URL).startsWith('https') ? 'https' : 'http',
-        hostname: (process.env.NEXT_PUBLIC_API_URL).includes('://') ? new URL(process.env.NEXT_PUBLIC_API_URL).hostname : 'localhost',
-        port: (process.env.NEXT_PUBLIC_API_URL).includes('://') ? new URL(process.env.NEXT_PUBLIC_API_URL).port || ((process.env.NEXT_PUBLIC_API_URL).startsWith('https') ? '443' : '8000') : '8000',
+        protocol: apiUrl.startsWith('https') ? 'https' : 'http',
+        hostname: apiUrl.includes('://') ? new URL(apiUrl).hostname : 'localhost',
+        port: apiUrl.includes('://') ? new URL(apiUrl).port || (apiUrl.startsWith('https') ? '443' : '8000') : '8000',
         pathname: '/api/**',
       },
     ],
   },
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     return [
       {
         source: '/api/:path*',
@@ -32,8 +35,8 @@ const nextConfig = {
     ];
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
+    NEXT_PUBLIC_API_URL: apiUrl,
+    NEXT_PUBLIC_WS_URL: wsUrl,
   },
 };
 

@@ -53,6 +53,8 @@ async def get_users(
         users = []
         
         async for user_doc in cursor:
+            # Debug: Print user data to see if last_login is present
+            print(f"🔍 User doc for {user_doc.get('username', 'unknown')}: last_login = {user_doc.get('last_login')}")
             users.append(User(**user_doc))
         
         total_pages = (total + limit - 1) // limit

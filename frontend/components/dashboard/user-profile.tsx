@@ -24,19 +24,12 @@ export function UserProfile() {
   const router = useRouter();
   const { profile, loading, error, updateProfile, fetchProfile } = useProfile();
   const [isEditing, setIsEditing] = useState(false);
-  const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     email: '',
   });
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
   const [isSaving, setIsSaving] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Initialize form data when profile loads
   useEffect(() => {
@@ -88,33 +81,6 @@ export function UserProfile() {
     setIsEditing(false);
   };
 
-  const handlePasswordChange = (field: string, value: string) => {
-    setPasswordData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSavePassword = async () => {
-    try {
-      setIsChangingPassword(true);
-      // Call the password change API
-      // await changePassword(passwordData);
-      alert('Password changed successfully!');
-      setIsEditingSecurity(false);
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    } catch (error) {
-      console.error('Failed to change password:', error);
-      alert('Failed to change password. Please try again.');
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
-
-  const handleCancelPassword = () => {
-    setIsEditingSecurity(false);
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  };
 
   if (!user) {
     return (
@@ -359,96 +325,6 @@ export function UserProfile() {
             </div>
           </div>
 
-          {/* Password Management */}
-          <div className="mt-6 bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">Password Management</h3>
-                {!isEditingSecurity && (
-                  <button
-                    onClick={() => setIsEditingSecurity(true)}
-                    className="flex items-center space-x-2 px-3 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm"
-                  >
-                    <Shield className="h-4 w-4" />
-                    <span>Edit Security</span>
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              {isEditingSecurity ? (
-                <>
-                  {/* Current Password */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Password
-                    </label>
-                    <input
-                      type="password"
-                      value={passwordData.currentPassword}
-                      onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
-                      placeholder="Enter current password"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  {/* New Password */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      New Password
-                    </label>
-                    <input
-                      type="password"
-                      value={passwordData.newPassword}
-                      onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-                      placeholder="Enter new password"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.
-                    </p>
-                  </div>
-
-                  {/* Confirm New Password */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Confirm New Password
-                    </label>
-                    <input
-                      type="password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
-                      placeholder="Confirm new password"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex space-x-3 pt-4">
-                    <button
-                      onClick={handleSavePassword}
-                      disabled={isChangingPassword}
-                      className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isChangingPassword ? 'Changing...' : 'Save Password'}
-                    </button>
-                    <button
-                      onClick={handleCancelPassword}
-                      className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4">Click "Edit Security" to change your password</p>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Account Actions */}
           <div className="mt-6 bg-white rounded-lg shadow">
@@ -465,13 +341,6 @@ export function UserProfile() {
                 Account Settings
               </button>
               
-              <button
-                onClick={() => router.push('/dashboard/account')}
-                className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                Security & Privacy
-              </button>
               
 
             </div>

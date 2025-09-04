@@ -33,6 +33,7 @@ async def get_user(username: str) -> Optional[UserInDB]:
         if user_doc:
             # Ensure all required fields are present and properly formatted
             user_data = {
+                "_id": user_doc.get("_id"),  # Include the MongoDB _id
                 "username": user_doc.get("username"),
                 "email": user_doc.get("email"),
                 "first_name": user_doc.get("first_name", ""),  # Provide default if missing
@@ -189,11 +190,18 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     # Update last_login timestamp
     try:
         database = get_database()
+        from bson import ObjectId
+        
+        # Convert string ID to ObjectId for MongoDB query
+        user_object_id = ObjectId(user.id) if isinstance(user.id, str) else user.id
+        
         await database.users.update_one(
-            {"_id": user.id},
+            {"_id": user_object_id},
             {"$set": {"last_login": datetime.utcnow()}}
         )
         print(f"📅 Updated last_login for user: {form_data.username}")
+        print(f"🔍 Updated user ID: {user_object_id}")
+        print(f"🔍 Last login timestamp: {datetime.utcnow()}")
     except Exception as e:
         print(f"⚠️ Failed to update last_login for user {form_data.username}: {e}")
         print(f"🔍 User ID: {user.id}, Type: {type(user.id)}")
@@ -296,11 +304,18 @@ async def login(user_data: UserLogin):
     # Update last_login timestamp
     try:
         database = get_database()
+        from bson import ObjectId
+        
+        # Convert string ID to ObjectId for MongoDB query
+        user_object_id = ObjectId(user.id) if isinstance(user.id, str) else user.id
+        
         await database.users.update_one(
-            {"_id": user.id},
+            {"_id": user_object_id},
             {"$set": {"last_login": datetime.utcnow()}}
         )
         print(f"📅 Updated last_login for user: {user_data.username}")
+        print(f"🔍 Updated user ID: {user_object_id}")
+        print(f"🔍 Last login timestamp: {datetime.utcnow()}")
     except Exception as e:
         print(f"⚠️ Failed to update last_login for user {user_data.username}: {e}")
         print(f"🔍 User ID: {user.id}, Type: {type(user.id)}")

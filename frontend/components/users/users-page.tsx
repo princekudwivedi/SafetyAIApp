@@ -19,6 +19,7 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { User, UserRole } from '@/types/auth';
 import { usersApi, UserCreate, UserFilters } from '@/lib/api/users';
+import { sitesApi, Site } from '@/lib/api/sites';
 
 const userFormSchema = z.object({
   username: z.string().min(2, 'Username must be at least 2 characters'),
@@ -64,6 +65,8 @@ export function UsersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userFormSchema),
@@ -96,7 +99,17 @@ export function UsersPage() {
 
   useEffect(() => {
     loadUsers();
+    loadSites();
   }, [filters]);
+
+  // Refresh users list every 30 seconds to show updated last_login
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadUsers();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const loadUsers = async () => {
     try {
@@ -110,6 +123,16 @@ export function UsersPage() {
       toast.error('Failed to load users');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSites = async () => {
+    try {
+      const sitesData = await sitesApi.getSites();
+      setSites(sitesData);
+    } catch (error: any) {
+      console.error('Error loading sites:', error);
+      toast.error('Failed to load sites');
     }
   };
 
@@ -232,44 +255,54 @@ export function UsersPage() {
               Manage user accounts, roles, and permissions across the system
             </p>
           </div>
-          <button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <UserPlus className="h-4 w-4" />
-            <span>Add User</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => {
+                loadUsers();
+                loadSites();
+              }}
+              className="flex items-center space-x-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add User</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6">
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Search & Filter Users
-              </h2>
-              <button
-                onClick={() => setFilters({ page: 1, limit: 10 })}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Clear All
-              </button>
-            </div>
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900"
+            >
+              <Filter className="h-4 w-4" />
+              <span>{showFilters ? 'Hide' : 'Show'} Filters</span>
+            </button>
           </div>
-          
-          <div className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Search Input */}
+        </div>
+
+        {showFilters && (
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Search */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search users by name, email, or username..."
+                    placeholder="Search users..."
                     value={filters.search || ''}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -308,7 +341,7 @@ export function UsersPage() {
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Users Table */}
@@ -619,10 +652,11 @@ export function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No site assigned</SelectItem>
-                    <SelectItem value="SITE_001">Downtown Construction Project</SelectItem>
-                    <SelectItem value="SITE_002">Highway Bridge Construction</SelectItem>
-                    <SelectItem value="SITE_003">Shopping Mall Renovation</SelectItem>
-                    <SelectItem value="SITE_004">Industrial Warehouse Complex</SelectItem>
+                    {sites.map((site) => (
+                      <SelectItem key={site.site_id} value={site.site_id}>
+                        {site.site_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-gray-500 flex items-center">
@@ -822,10 +856,11 @@ export function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No site assigned</SelectItem>
-                    <SelectItem value="SITE_001">Downtown Construction Project</SelectItem>
-                    <SelectItem value="SITE_002">Highway Bridge Construction</SelectItem>
-                    <SelectItem value="SITE_003">Shopping Mall Renovation</SelectItem>
-                    <SelectItem value="SITE_004">Industrial Warehouse Complex</SelectItem>
+                    {sites.map((site) => (
+                      <SelectItem key={site.site_id} value={site.site_id}>
+                        {site.site_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-gray-500 flex items-center">

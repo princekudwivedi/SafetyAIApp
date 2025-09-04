@@ -477,17 +477,6 @@ export function Header({ setSidebarOpen }: HeaderProps) {
                   Settings
                 </button>
                 
-                <button 
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    router.push('/dashboard/account');
-                  }}
-                  className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <Shield className="mr-3 h-4 w-4" />
-                  Account Security
-                </button>
-                
                 <div className="border-t border-gray-200 my-1"></div>
                 
                 <button

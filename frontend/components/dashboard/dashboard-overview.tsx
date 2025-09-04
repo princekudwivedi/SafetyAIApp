@@ -4,10 +4,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useWebSocket } from '@/contexts/websocket-context';
 import { MetricCard } from './metric-card';
 import { SafetyChart } from './safety-chart';
-
-import { RecentAlerts } from './recent-alerts';
 import { SystemStatus } from './system-status';
-import { TrendingUp, TrendingDown, AlertTriangle, Video, Users, Shield } from 'lucide-react';
+import { AlertTriangle, Video, Users, Shield } from 'lucide-react';
 import { dashboardApi, DashboardStats as ApiDashboardStats, AlertsSummary } from '@/lib/api/dashboard';
 
 
@@ -260,22 +258,13 @@ export function DashboardOverview() {
 
 
 
-      {/* Charts and Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Alerts</h2>
-          <RecentAlerts 
-            alertsSummary={alertsSummary}
-            isLoading={isLoading}
-          />
-        </div>
-        
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
-          <SystemStatus />
-        </div>
-      </div>
 
+
+      {/* System Status */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
+        <SystemStatus />
+      </div>
 
     </div>
   );

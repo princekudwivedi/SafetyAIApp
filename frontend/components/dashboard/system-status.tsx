@@ -30,36 +30,6 @@ const systemComponents: SystemComponent[] = [
     details: 'Real-time communication active',
     lastCheck: 'Just now',
   },
-  {
-    name: 'Camera CAM_01',
-    status: 'online',
-    details: 'Streaming from Zone 1',
-    lastCheck: '2 minutes ago',
-  },
-  {
-    name: 'Camera CAM_02',
-    status: 'online',
-    details: 'Streaming from Zone 1',
-    lastCheck: '1 minute ago',
-  },
-  {
-    name: 'Camera CAM_03',
-    status: 'warning',
-    details: 'High latency detected',
-    lastCheck: '30 seconds ago',
-  },
-  {
-    name: 'Camera CAM_04',
-    status: 'offline',
-    details: 'Connection lost',
-    lastCheck: '5 minutes ago',
-  },
-  {
-    name: 'Camera CAM_05',
-    status: 'online',
-    details: 'Streaming from Zone 3',
-    lastCheck: 'Just now',
-  },
 ];
 
 const statusConfig = {
@@ -173,26 +143,6 @@ export function SystemStatus() {
         </div>
       </div>
 
-      {/* Performance Metrics */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center space-x-2 mb-2">
-            <Cpu className="h-5 w-5 text-blue-600" />
-            <span className="font-medium text-blue-900">AI Processing</span>
-          </div>
-          <p className="text-2xl font-bold text-blue-600">98%</p>
-          <p className="text-sm text-blue-700">Efficiency</p>
-        </div>
-        
-        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-          <div className="flex items-center space-x-2 mb-2">
-            <Database className="h-5 w-5 text-purple-600" />
-            <span className="font-medium text-purple-900">Database</span>
-          </div>
-          <p className="text-2xl font-bold text-purple-600">45ms</p>
-          <p className="text-sm text-purple-700">Avg Response</p>
-        </div>
-      </div>
     </div>
   );
 }

@@ -39,7 +39,7 @@ export function useNotifications(): UseNotificationsReturn {
     const unsubscribeNewAlert = subscribe('new_alert', (data) => {
       if (data.type === 'new_alert' && data.payload) {
         const newNotification: Notification = {
-          id: `alert-${Date.now()}`,
+          id: `alert-${data.payload.alert_id}`,
           type: 'alert',
           title: 'Safety Violation Detected',
           message: `${data.payload.violation_type} detected in ${data.payload.location_id || 'unknown location'}`,
@@ -101,7 +101,18 @@ export function useNotifications(): UseNotificationsReturn {
   }, [subscribe, isConnected]);
 
   const addNotification = useCallback((notification: Notification) => {
-    setNotifications(prev => [notification, ...prev.slice(0, 49)]); // Keep max 50 notifications
+    setNotifications(prev => {
+      // Check if notification with same ID already exists
+      const existingIndex = prev.findIndex(n => n.id === notification.id);
+      if (existingIndex !== -1) {
+        // Update existing notification instead of adding duplicate
+        const updated = [...prev];
+        updated[existingIndex] = notification;
+        return updated;
+      }
+      // Add new notification
+      return [notification, ...prev.slice(0, 49)]; // Keep max 50 notifications
+    });
   }, []);
 
   const markAsRead = useCallback((notificationId: string) => {

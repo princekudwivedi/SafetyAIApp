@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Filter, Search, Clock, MapPin, Camera, User, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAlerts } from '@/hooks/use-alerts';
+import { useNotifications } from '@/hooks/use-notifications';
 import { Alert as AlertType } from '@/lib/api/alerts';
 import { extractErrorMessage } from '@/lib/utils/error-handling';
 import { Pagination } from '@/components/ui/pagination';
@@ -51,6 +52,7 @@ const severityLabels = {
 
 export function AlertsPage() {
   const { subscribe, isConnected } = useWebSocket();
+  const { markAsRead } = useNotifications();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -92,9 +94,14 @@ export function AlertsPage() {
         setSelectedAlert(alertFromUrl);
         setIsModalOpen(true);
         console.log('Alert from URL opened:', alertFromUrl.violation_type);
+        
+        // Mark corresponding notification as read
+        // Find notification by alert ID and mark it as read
+        const notificationId = `alert-${alertFromUrl.alert_id}`;
+        markAsRead(notificationId);
       }
     }
-  }, [searchParams, paginatedAlerts]);
+  }, [searchParams, paginatedAlerts, markAsRead]);
 
   // Apply search filter to paginated alerts
   const searchFilteredAlerts = paginatedAlerts.filter(alert =>
@@ -124,6 +131,10 @@ export function AlertsPage() {
   const handleViewDetails = (alert: AlertType) => {
     setSelectedAlert(alert);
     setIsModalOpen(true);
+    
+    // Mark corresponding notification as read
+    const notificationId = `alert-${alert.alert_id}`;
+    markAsRead(notificationId);
   };
 
   const closeModal = () => {

@@ -1,4 +1,5 @@
 import { AxiosError, AxiosResponse } from 'axios';
+import toast from 'react-hot-toast';
 
 export interface ApiError {
   status: number;
@@ -171,6 +172,9 @@ class CentralizedErrorHandler {
       configKeys: Object.keys(this.config)
     });
     
+    // Show toast notification for authentication failure
+    toast.error('Session expired. Please log in again.');
+    
     // Clear all authentication data
     this.clearAuthData();
     
@@ -194,11 +198,11 @@ class CentralizedErrorHandler {
   private handleForbidden(apiError: ApiError): void {
     console.warn('🚫 Access forbidden:', apiError.message);
     
+    // Show toast notification for forbidden access
+    toast.error('Access denied. You do not have permission to perform this action.');
+    
     if (this.config.onForbidden) {
       this.config.onForbidden();
-    } else {
-      // Default behavior: show error message
-      this.showErrorNotification('Access Denied', apiError.message);
     }
   }
 
@@ -208,11 +212,11 @@ class CentralizedErrorHandler {
   private handleServerError(apiError: ApiError): void {
     console.error('💥 Server error:', apiError.message);
     
+    // Show toast notification for server errors
+    toast.error('Server error occurred. Please try again later.');
+    
     if (this.config.onServerError) {
       this.config.onServerError(apiError);
-    } else {
-      // Default behavior: show error message
-      this.showErrorNotification('Server Error', 'The server encountered an error. Please try again later.');
     }
   }
 
@@ -222,11 +226,11 @@ class CentralizedErrorHandler {
   private handleNetworkError(apiError: ApiError): void {
     console.error('🌐 Network error:', apiError.message);
     
+    // Show toast notification for network errors
+    toast.error('Connection error. Please check your internet connection.');
+    
     if (this.config.onNetworkError) {
       this.config.onNetworkError(apiError);
-    } else {
-      // Default behavior: show error message
-      this.showErrorNotification('Connection Error', 'Unable to connect to the server. Please check your internet connection.');
     }
   }
 
@@ -246,12 +250,12 @@ class CentralizedErrorHandler {
       console.warn('⚠️ Validation error:', apiError.message);
     }
     
+    // Show toast notification for validation errors
+    const message = apiError.status === 422 ? 'Please check your input data and try again.' : apiError.message;
+    toast.error(message);
+    
     if (this.config.onValidationError) {
       this.config.onValidationError(apiError);
-    } else {
-      // Default behavior: show error message
-      const title = apiError.status === 422 ? 'Data Validation Error' : 'Validation Error';
-      this.showErrorNotification(title, apiError.message);
     }
   }
 

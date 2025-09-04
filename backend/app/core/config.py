@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     REMEMBER_ME_ACCESS_TOKEN_EXPIRE_DAYS: int = os.getenv("REMEMBER_ME_ACCESS_TOKEN_EXPIRE_DAYS")  # 30 days for remember me
     
     # CORS
-    ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS")
+    ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS", ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000", "http://127.0.0.1:8000"])
     
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod

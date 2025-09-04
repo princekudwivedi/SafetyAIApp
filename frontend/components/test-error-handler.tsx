@@ -24,6 +24,8 @@ export function TestErrorHandler() {
       setStatus(`Unexpected success: ${response.status}`);
     } catch (error: any) {
       setStatus(`Error caught: ${error.status} - ${error.message}`);
+      // The error handler should show a toast notification and handle logout
+      console.log('401 error test completed - check for toast notification');
     }
   };
 
@@ -34,6 +36,19 @@ export function TestErrorHandler() {
       setStatus(`Valid endpoint response: ${response.status}`);
     } catch (error: any) {
       setStatus(`Valid endpoint error: ${error.status} - ${error.message}`);
+    }
+  };
+
+  const testServerError = async () => {
+    setStatus('Testing server error...');
+    try {
+      // This should trigger a 500 error
+      const response = await apiClient.get('/api/v1/test/server-error');
+      setStatus(`Unexpected success: ${response.status}`);
+    } catch (error: any) {
+      setStatus(`Server error caught: ${error.status} - ${error.message}`);
+      // The error handler should show a toast notification
+      console.log('Server error test completed - check for toast notification');
     }
   };
 
@@ -70,11 +85,19 @@ export function TestErrorHandler() {
           >
             Test Valid Endpoint
           </button>
+          
+          <button
+            onClick={testServerError}
+            className="px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+          >
+            Test Server Error
+          </button>
         </div>
         
         <div className="text-xs text-gray-500">
           <p>This component helps debug the centralized error handler.</p>
           <p>Check the browser console for detailed logs.</p>
+          <p><strong>New:</strong> Toast notifications should appear for errors instead of page reloads.</p>
         </div>
       </div>
     </div>

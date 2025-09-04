@@ -119,13 +119,8 @@ apiClient.interceptors.response.use(
         // Process queued requests with error
         processQueue(refreshError, null);
         
-        // Clear all tokens and redirect to login
+        // Clear all tokens - let the error handler handle logout and navigation
         TokenManager.clearTokens();
-        
-        // Redirect to login page
-        if (typeof window !== 'undefined') {
-          window.location.href = '/';
-        }
         
         return Promise.reject(refreshError);
       } finally {

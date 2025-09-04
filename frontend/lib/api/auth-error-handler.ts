@@ -19,10 +19,10 @@ export const createAuthErrorHandler = (logoutCallback: () => void): ErrorHandler
         logoutCallbackType: typeof logoutCallback
       });
       
-      // Call the logout callback from auth context
-      // This ensures the auth state is properly updated
+      // Call the logout callback from auth context without showing toast
+      // The error handler will show the toast notification
       try {
-        logoutCallback();
+        logoutCallback(false); // Don't show toast, error handler will show it
         console.log('✅ Logout callback executed successfully');
       } catch (error) {
         console.error('❌ Error executing logout callback:', error);

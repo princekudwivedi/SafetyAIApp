@@ -4,12 +4,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { User, LoginCredentials, UserRole, AuthResponse } from '../types/auth';
 import { authApi } from '../lib/api/auth';
 import { createAuthErrorHandler } from '../lib/api/auth-error-handler';
+import toast from 'react-hot-toast';
 
 export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: (showToast?: boolean) => void;
   refreshUser: () => Promise<void>;
 }
 
@@ -221,15 +222,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = (showToast: boolean = true) => {
     console.log('🚪 Logging out user');
     
     // Clear all authentication data
     clearAuthData();
     
-    // Redirect to login page
+    // Show toast notification if requested
+    if (showToast) {
+      toast.error('Session expired. Please log in again.');
+    }
+    
+    // Use proper navigation instead of hard redirect
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      // Use replace to avoid back button issues
+      window.history.replaceState(null, '', '/');
+      // Trigger a popstate event to notify the app of the route change
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   };
 

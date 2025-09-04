@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useAlerts } from '@/hooks/use-alerts';
+import { useNotifications } from '@/hooks/use-notifications';
 import { useSearch } from '@/hooks/use-search';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ interface HeaderProps {
 export function Header({ setSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
   const { alerts, isLoading } = useAlerts();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const { 
     searchQuery, 
     searchResults, 
@@ -186,6 +188,21 @@ export function Header({ setSidebarOpen }: HeaderProps) {
     setShowNotifications(false);
   };
 
+  const handleNotificationClick = (notification: any) => {
+    // Mark notification as read
+    markAsRead(notification.id);
+    
+    // If it's an alert notification, navigate to the alerts page
+    if (notification.type === 'alert' && notification.data?.alertId) {
+      router.push(`/dashboard/alerts?alert=${notification.data.alertId}`);
+    } else {
+      // For other notification types, just navigate to alerts page
+      router.push('/dashboard/alerts');
+    }
+    
+    setShowNotifications(false);
+  };
+
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
       {/* Mobile menu button */}
@@ -328,9 +345,9 @@ export function Header({ setSidebarOpen }: HeaderProps) {
           >
                          <span className="sr-only">View alerts</span>
             <Bell className="h-6 w-6" />
-            {alerts && alerts.length > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
-                {alerts.length > 9 ? '9+' : alerts.length}
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
@@ -352,36 +369,38 @@ export function Header({ setSidebarOpen }: HeaderProps) {
                  </div>
                 
                                  <div className="max-h-80 overflow-y-auto">
-                   {!alerts || alerts.length === 0 ? (
+                   {!notifications || notifications.length === 0 ? (
                      <div className="px-4 py-8 text-center text-gray-500">
                        <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                       <p>No alerts</p>
+                       <p>No notifications</p>
                      </div>
                    ) : (
-                     alerts.slice(0, 5).map((alert) => (
+                     notifications.slice(0, 5).map((notification) => (
                        <div
-                         key={alert._id}
+                         key={notification.id}
                          className={cn(
                            "px-4 py-3 hover:bg-gray-50 cursor-pointer border-l-4",
-                           "border-primary-500 bg-blue-50"
+                           notification.isRead ? "border-gray-300 bg-gray-50" : "border-primary-500 bg-blue-50"
                          )}
-                         onClick={() => handleAlertClick(alert)}
+                         onClick={() => handleNotificationClick(notification)}
                        >
                          <div className="flex items-start">
                            <div className="flex-shrink-0 mt-1">
-                             <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", getAlertColor(alert.severity_level))}>
-                               {getAlertIcon(alert.severity_level)}
+                             <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", 
+                               notification.type === 'alert' ? getAlertColor(notification.data?.severity || 'medium') : 'bg-gray-100 text-gray-600'
+                             )}>
+                               {notification.type === 'alert' ? getAlertIcon(notification.data?.severity || 'medium') : <Bell className="h-4 w-4" />}
                              </div>
                            </div>
                            <div className="ml-3 flex-1 min-w-0">
                              <p className="text-sm font-medium text-gray-900">
-                               {alert.violation_type}
+                               {notification.title}
                              </p>
                              <p className="text-sm text-gray-500 mt-1">
-                               {alert.description}
+                               {notification.message}
                              </p>
                              <p className="text-xs text-gray-400 mt-2">
-                               Camera {alert.camera_id} • {formatTimestamp(new Date(alert.timestamp))}
+                               {notification.data?.camera ? `Camera ${notification.data.camera} • ` : ''}{formatTimestamp(notification.timestamp)}
                              </p>
                            </div>
                          </div>
@@ -393,6 +412,7 @@ export function Header({ setSidebarOpen }: HeaderProps) {
                                  <div className="border-t border-gray-200 px-4 py-2">
                    <button 
                      onClick={() => {
+                       markAllAsRead(); // Mark all notifications as read
                        setShowNotifications(false);
                        router.push('/dashboard/alerts');
                      }}

@@ -12,13 +12,13 @@ export function ErrorHandlerProvider({ children }: { children: React.ReactNode }
   const { logout } = useAuth();
 
   // Create a stable logout callback that includes fallback behavior
-  const logoutCallback = useCallback(() => {
+  const logoutCallback = useCallback((showToast: boolean = true) => {
     console.log('🔐 Logout callback triggered from error handler');
     
     try {
       // Call the auth context logout if available
       if (logout) {
-        logout();
+        logout(showToast);
       } else {
         console.warn('⚠️ Auth context logout not available, using fallback');
         // Fallback logout behavior
@@ -59,7 +59,7 @@ export function ErrorHandlerProvider({ children }: { children: React.ReactNode }
       console.error('❌ Failed to initialize error handler:', error);
       
       // Create a basic error handler as fallback
-      const fallbackConfig = createAuthErrorHandler(() => {
+      const fallbackConfig = createAuthErrorHandler((showToast: boolean = true) => {
         console.warn('🔄 Using fallback logout handler');
         localStorage.clear();
         if (typeof window !== 'undefined') {

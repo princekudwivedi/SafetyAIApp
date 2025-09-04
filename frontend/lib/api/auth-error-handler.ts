@@ -4,7 +4,7 @@ import { createErrorHandler, ErrorHandlerConfig, ApiError } from './error-handle
  * Custom error handler configuration that integrates with the auth context
  * This provides better logout handling and user experience
  */
-export const createAuthErrorHandler = (logoutCallback: () => void): ErrorHandlerConfig => {
+export const createAuthErrorHandler = (logoutCallback: (showToast?: boolean) => void): ErrorHandlerConfig => {
   console.log('🔧 Creating auth error handler with logout callback:', {
     hasLogoutCallback: !!logoutCallback,
     logoutCallbackType: typeof logoutCallback,
@@ -70,7 +70,7 @@ export const createAuthErrorHandler = (logoutCallback: () => void): ErrorHandler
  * Enhanced error handler configuration with additional features
  */
 export const createEnhancedErrorHandler = (
-  logoutCallback: () => void,
+  logoutCallback: (showToast?: boolean) => void,
   showNotification?: (type: 'error' | 'warning' | 'info', message: string) => void
 ): ErrorHandlerConfig => {
   const baseConfig = createAuthErrorHandler(logoutCallback);

@@ -96,7 +96,7 @@ export function LoginForm() {
                 <p>Use any of these accounts to sign in:</p>
                 <ul className="mt-1 space-y-1">
                   <li><strong>admin</strong>/admin123 (Administrator)</li>
-                  <li><strong>supervisor</strong>/super123 (Supervisor)</li>
+                  <li><strong>supervisor</strong>/supervisor123 (Supervisor)</li>
                   <li><strong>safety</strong>/safety123 (Safety Officer)</li>
                   <li><strong>operator</strong>/operator123 (Operator)</li>
                 </ul>

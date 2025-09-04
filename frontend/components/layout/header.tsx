@@ -461,13 +461,13 @@ export function Header({ setSidebarOpen }: HeaderProps) {
                 </div>
                 
                 {/* Menu Items */}
-                <button 
+                {/* <button 
                   onClick={handleProfileClick}
                   className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <User className="mr-3 h-4 w-4" />
                   Profile
-                </button>
+                </button> */}
                 
                 <button 
                   onClick={handleSettingsClick}

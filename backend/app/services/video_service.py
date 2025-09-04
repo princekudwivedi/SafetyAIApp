@@ -195,7 +195,8 @@ class VideoService:
                 frame=frame,
                 camera_id=camera_id,
                 timestamp=datetime.utcnow(),
-                frame_number=frame_number
+                frame_number=frame_number,
+                location_id=location_id
             )
             
             # Debug logging to see what's returned
@@ -304,10 +305,21 @@ class VideoService:
             logger.error(f"Error saving snapshot: {e}")
             return None
     
-    async def process_video_file(self, upload_id: str, file_path: str, camera_id: str, user_id: str):
+    async def process_video_file(self, upload_id: str, file_path: str, camera_id: str, user_id: str, location_id: str = None):
         """Process an uploaded video file to test alert generation."""
         try:
             logger.info(f"Starting video file processing: {upload_id}")
+            
+            # Get location_id from camera if not provided
+            if location_id is None:
+                from app.core.database import get_database
+                database = get_database()
+                camera_doc = await database.cameras.find_one({"camera_id": camera_id})
+                if camera_doc:
+                    location_id = camera_doc.get("site_id", "unknown")
+                else:
+                    location_id = "unknown"
+                    logger.warning(f"Camera {camera_id} not found, using 'unknown' as location_id")
             
             # Set a maximum processing time (e.g., 10 minutes)
             max_processing_time = 600  # seconds
@@ -352,7 +364,8 @@ class VideoService:
                             frame=frame,
                             camera_id=camera_id,
                             timestamp=datetime.utcnow(),
-                            frame_number=frame_count
+                            frame_number=frame_count,
+                            location_id=location_id
                         )
                         
                         # Check if alert should be generated
@@ -378,7 +391,7 @@ class VideoService:
                                     logger.info(f"Using AlertCreate object directly for alert creation")
                                     
                                     # Update the location_id if it's "unknown" and we have a better one
-                                    if primary_violation.location_id == "unknown":
+                                    if primary_violation.location_id == "unknown" and location_id != "unknown":
                                         # Create a new AlertCreate object with the correct location_id
                                         from app.models.safety import AlertCreate
                                         updated_alert = AlertCreate(
@@ -386,7 +399,7 @@ class VideoService:
                                             severity_level=primary_violation.severity_level,
                                             description=primary_violation.description,
                                             confidence_score=primary_violation.confidence_score,
-                                            location_id="main_entrance",  # Use actual location from context
+                                            location_id=location_id,  # Use actual location from context
                                             camera_id=primary_violation.camera_id,
                                             primary_object=primary_violation.primary_object,
                                             snapshot_url=primary_violation.snapshot_url

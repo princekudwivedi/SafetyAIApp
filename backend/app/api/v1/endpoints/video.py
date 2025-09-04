@@ -344,8 +344,10 @@ async def process_video_file(
         try:
             # Process video file
             results = await video_service.process_video_file(
+                upload_id=str(uuid.uuid4()),  # Generate a temporary upload_id
                 file_path=temp_file_path,
                 camera_id=camera_id,
+                user_id=current_user.id,
                 location_id=location_id
             )
             
@@ -795,13 +797,19 @@ async def process_video_file(
         upload_info["status"] = "processing"
         upload_info["process_start_time"] = datetime.utcnow()
         
+        # Get location_id from camera
+        database = get_database()
+        camera_doc = await database.cameras.find_one({"camera_id": upload_info["camera_id"]})
+        location_id = camera_doc.get("site_id", "unknown") if camera_doc else "unknown"
+        
         # Start video processing in background
         asyncio.create_task(
             video_service.process_video_file(
                 upload_id=upload_id,
                 file_path=upload_info["file_path"],
                 camera_id=upload_info["camera_id"],
-                user_id=current_user.id
+                user_id=current_user.id,
+                location_id=location_id
             )
         )
         

@@ -326,7 +326,7 @@ class AIEngine:
             return None
     
     def analyze_frame(self, frame: np.ndarray, camera_id: str, 
-                     timestamp: datetime, frame_number: int = 0) -> Dict[str, Any]:
+                     timestamp: datetime, frame_number: int = 0, location_id: str = "unknown") -> Dict[str, Any]:
         """Analyze a single frame for safety violations and return analysis results."""
         try:
             # Detect objects in the frame
@@ -341,7 +341,7 @@ class AIEngine:
                 }
             
             # Analyze for safety violations
-            alerts = self.analyze_safety_violations(detections, frame, camera_id, "unknown")
+            alerts = self.analyze_safety_violations(detections, frame, camera_id, location_id)
             
             # Debug logging for alerts
             logger.info(f"Generated {len(alerts)} alerts from safety analysis")
